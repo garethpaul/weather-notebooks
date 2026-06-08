@@ -39,7 +39,7 @@ Weather notebooks can leak API tokens and create misleading stale analysis.
 Tokens should stay local, and outputs should clearly identify source dates and
 station scope.
 
-## What We Will Not Merge For Now
+## What We Will Not Merge (For Now)
 
 - Checked-in API tokens
 - Current-weather claims from stale data

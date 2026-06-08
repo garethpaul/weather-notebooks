@@ -45,3 +45,6 @@ station scope.
 - Current-weather claims from stale data
 - Dataset refreshes without source dates
 - Hidden network calls outside the documented API
+
+This list is a roadmap guardrail, not a permanent rule.
+Strong user demand and strong technical rationale can change it.

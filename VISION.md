@@ -39,7 +39,6 @@ Canonical security policy and reporting:
 
 - [`SECURITY.md`](SECURITY.md)
 
-
 Weather notebooks can leak API tokens and create misleading stale analysis.
 Tokens should stay local, and outputs should clearly identify source dates and
 station scope.

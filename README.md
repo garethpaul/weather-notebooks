@@ -26,29 +26,37 @@ Additional scan context:
 ### Prerequisites
 
 - Git
+- Python 3
+- A NOAA Climate Data Online API token available as `NOAA_TOKEN`
 
 ### Setup
 
 ```bash
 git clone https://github.com/garethpaul/weather-notebooks.git
 cd weather-notebooks
+python -m pip install -r requirements.txt
+export NOAA_TOKEN=your-noaa-token
 ```
 
 The setup commands above are derived from repository files. Legacy mobile, Python, or JavaScript samples may require older SDKs or package versions than a modern workstation uses by default.
 
 ## Running or Using the Project
 
-- No single runtime entry point was identified. Start by reading the source files and manifests listed above.
+- Run `jupyter notebook Weather.ipynb` after installing dependencies and setting `NOAA_TOKEN`.
+- The notebook fetches NOAA CDO observations for station `GHCND:US1CAMR0037` across the configured date range.
 
 ## Testing and Verification
 
-- No dedicated automated test command was identified from the checked-in files. Verify changes by running the relevant build or manually exercising the sample.
+- `make verify` runs static notebook reproducibility and token-safety checks.
+- `make check` runs `make verify` with bytecode cleanup before and after.
+- `python3 scripts/check_weather_notebook_contracts.py` runs just the notebook contracts.
 
 When the required SDK or runtime is unavailable, use static checks and source review first, then verify on a machine that has the matching platform toolchain.
 
 ## Configuration and Secrets
 
-- No required secret or credential file was identified in the repository scan. If you add integrations later, keep secrets out of git.
+- `NOAA_TOKEN` is required to fetch NOAA Climate Data Online data. Keep it in your local environment and out of git.
+- Do not commit NOAA API tokens, private datasets, or refreshed outputs without source dates.
 
 ## Security and Privacy Notes
 

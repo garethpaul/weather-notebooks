@@ -49,7 +49,9 @@ def test_notebook_has_no_stale_outputs():
 
 def test_completed_plan_is_in_docs_plans():
     assert_true(PLAN_PATH.is_file(), "weather notebook plan must live under docs/plans")
-    assert_true("status: completed" in PLAN_PATH.read_text(), "weather notebook plan must be completed")
+    plan_text = PLAN_PATH.read_text()
+    assert_true("status: completed" in plan_text.lower(), "weather notebook plan must be completed")
+    assert_true("make check" in plan_text, "weather notebook plan must document make check verification")
 
 
 def main():

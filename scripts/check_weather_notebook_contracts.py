@@ -20,6 +20,9 @@ EMPTY_ROWS_PLAN_PATH = (
 MEASUREMENT_ROWS_PLAN_PATH = (
     ROOT / "docs" / "plans" / "2026-06-09-weather-notebook-measurement-rows.md"
 )
+OBSERVATION_KEYS_PLAN_PATH = (
+    ROOT / "docs" / "plans" / "2026-06-09-weather-notebook-observation-keys.md"
+)
 
 
 def load_notebook():
@@ -87,6 +90,20 @@ def test_notebook_aligns_observations_by_date():
     )
     assert_true("dates_temp = []" not in source, "notebook must not rely on parallel date lists")
     assert_true("temps = []" not in source, "notebook must not rely on parallel value lists")
+
+
+def test_notebook_rejects_non_text_observation_keys():
+    source = notebook_source(load_notebook())
+    assert_true(
+        "if not isinstance(date, str) or not isinstance(datatype, str):" in source,
+        "NOAA observation date and datatype keys must be textual before bucketing",
+    )
+    assert_true(
+        source.index("if not isinstance(date, str) or not isinstance(datatype, str):")
+        < source.index("if not date or datatype not in SUPPORTED_DATATYPES:")
+        < source.index("weather_by_date.setdefault(date, {})[datatype]"),
+        "NOAA observation key type guard must run before set membership and bucketing",
+    )
 
 
 def test_notebook_guards_observation_dates_and_values():
@@ -188,6 +205,7 @@ def test_completed_plans_are_in_docs_plans():
     assert_completed_plan(RESPONSE_ROOT_PLAN_PATH, "weather notebook response root")
     assert_completed_plan(EMPTY_ROWS_PLAN_PATH, "weather notebook empty rows")
     assert_completed_plan(MEASUREMENT_ROWS_PLAN_PATH, "weather notebook measurement rows")
+    assert_completed_plan(OBSERVATION_KEYS_PLAN_PATH, "weather notebook observation keys")
 
 
 def main():
@@ -197,6 +215,7 @@ def main():
         test_noaa_result_shape_is_checked,
         test_notebook_has_no_stale_outputs,
         test_notebook_aligns_observations_by_date,
+        test_notebook_rejects_non_text_observation_keys,
         test_notebook_guards_observation_dates_and_values,
         test_notebook_rejects_empty_valid_observation_rows,
         test_notebook_skips_rows_without_measurements,

@@ -32,6 +32,10 @@ Helpful reports include:
 
 For notebooks or data-processing workflows, report unsafe parsing, path traversal, arbitrary code execution, credential exposure, and privacy risks involving included or referenced datasets. Do not submit reports that require exposing private third-party data.
 
+NOAA observation rows should reject malformed or non-text date and datatype
+keys before bucketing or conversion. Reports involving malformed API payloads
+should include a minimal synthetic response rather than live private data.
+
 ## Dependency and Supply Chain Security
 
 Dependency updates should come from trusted package managers and should keep lockfiles in sync when lockfiles exist. Do not commit credentials, private keys, tokens, generated secrets, or machine-local configuration. If a vulnerability depends on a compromised package, typosquatting risk, insecure transitive dependency, or unsafe build step, include the package name, affected version, and the path through which it is used.

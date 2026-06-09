@@ -19,6 +19,7 @@ Priority:
 - Make station ID, date range, and unit conversions visible
 - Validate NOAA result shapes before converting observations
 - Raise explicit errors for unexpected NOAA response roots
+- Reject non-text NOAA observation date and datatype keys before bucketing
 - Guard malformed NOAA dates and numeric values before building rows
 - Reject NaN and infinite NOAA numeric values before plotting
 - Reject empty parsed observation sets before plotting

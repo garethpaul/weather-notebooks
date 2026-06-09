@@ -2,6 +2,9 @@
 
 ## 2026-06-09
 
+- Rejected non-text NOAA observation `date` and `datatype` values before
+  supported-datatype checks and date bucketing.
+- Added static checker coverage for observation key type guards.
 - Skipped date-valid NOAA rows when every converted measurement value is
   missing or malformed before dataframe construction.
 - Added static checker coverage for measurement-empty row filtering.

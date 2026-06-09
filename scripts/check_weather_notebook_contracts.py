@@ -9,6 +9,7 @@ NOTEBOOK = ROOT / "Weather.ipynb"
 REPRODUCIBILITY_PLAN_PATH = ROOT / "docs" / "plans" / "2026-06-08-weather-notebook-reproducibility.md"
 DATE_ALIGNMENT_PLAN_PATH = ROOT / "docs" / "plans" / "2026-06-08-weather-notebook-date-alignment.md"
 DATA_SHAPE_PLAN_PATH = ROOT / "docs" / "plans" / "2026-06-08-weather-notebook-result-shape.md"
+VALUE_GUARDS_PLAN_PATH = ROOT / "docs" / "plans" / "2026-06-09-weather-notebook-value-guards.md"
 
 
 def load_notebook():
@@ -74,6 +75,26 @@ def test_notebook_aligns_observations_by_date():
     assert_true("temps = []" not in source, "notebook must not rely on parallel value lists")
 
 
+def test_notebook_guards_observation_dates_and_values():
+    source = notebook_source(load_notebook())
+    assert_true("def parse_noaa_date(value):" in source, "notebook must parse NOAA dates through a guard helper")
+    assert_true(
+        'return datetime.strptime(value, "%Y-%m-%dT%H:%M:%S")' in source,
+        "NOAA date parsing must keep the expected timestamp format",
+    )
+    assert_true(
+        "except (TypeError, ValueError):" in source,
+        "NOAA date and numeric parsing must tolerate malformed values",
+    )
+    assert_true("parsed_date = parse_noaa_date(date)" in source, "row building must parse dates before appending")
+    assert_true("if parsed_date is None:" in source, "row building must skip invalid NOAA dates")
+    assert_true('"date": parsed_date' in source, "row building must use the guarded date value")
+    assert_true("def noaa_number(value):" in source, "notebook must convert NOAA numeric values through a guard helper")
+    assert_true("number = noaa_number(value)" in source, "unit conversion must use guarded numeric conversion")
+    assert_true("return number / 10.0 * 1.8 + 32" in source, "temperature conversion must use guarded numeric values")
+    assert_true("return number / 25.54" in source, "precipitation conversion must use guarded numeric values")
+
+
 def assert_completed_plan(path, label):
     assert_true(path.is_file(), "{0} plan must live under docs/plans".format(label))
     plan_text = path.read_text()
@@ -85,6 +106,7 @@ def test_completed_plans_are_in_docs_plans():
     assert_completed_plan(REPRODUCIBILITY_PLAN_PATH, "weather notebook reproducibility")
     assert_completed_plan(DATE_ALIGNMENT_PLAN_PATH, "weather notebook date alignment")
     assert_completed_plan(DATA_SHAPE_PLAN_PATH, "weather notebook result shape")
+    assert_completed_plan(VALUE_GUARDS_PLAN_PATH, "weather notebook value guards")
 
 
 def main():
@@ -94,6 +116,7 @@ def main():
         test_noaa_result_shape_is_checked,
         test_notebook_has_no_stale_outputs,
         test_notebook_aligns_observations_by_date,
+        test_notebook_guards_observation_dates_and_values,
         test_completed_plans_are_in_docs_plans,
     ]
     for test in tests:

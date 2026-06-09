@@ -1,5 +1,12 @@
 # Changes
 
+## 2026-06-09
+
+- Added guarded NOAA timestamp and numeric value parsing before dataframe row
+  construction.
+- Added static checker coverage for malformed observation date and value
+  handling.
+
 ## 2026-06-08
 
 - Added explicit NOAA JSON result-shape checks before processing observation

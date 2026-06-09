@@ -14,6 +14,9 @@ FINITE_VALUES_PLAN_PATH = ROOT / "docs" / "plans" / "2026-06-09-weather-notebook
 RESPONSE_ROOT_PLAN_PATH = (
     ROOT / "docs" / "plans" / "2026-06-09-weather-notebook-response-root.md"
 )
+EMPTY_ROWS_PLAN_PATH = (
+    ROOT / "docs" / "plans" / "2026-06-09-weather-notebook-empty-rows.md"
+)
 
 
 def load_notebook():
@@ -108,6 +111,25 @@ def test_notebook_guards_observation_dates_and_values():
     assert_true("return number / 25.54" in source, "precipitation conversion must use guarded numeric values")
 
 
+def test_notebook_rejects_empty_valid_observation_rows():
+    source = notebook_source(load_notebook())
+    assert_true(
+        "if not rows:" in source,
+        "notebook must detect when all NOAA observation rows were skipped",
+    )
+    assert_true(
+        'raise ValueError("No valid NOAA observations were available")' in source,
+        "empty NOAA observation sets must raise an explicit error",
+    )
+    assert_true(
+        source.index("if not rows:")
+        < source.index(
+            'pd.DataFrame(rows, columns=["date", "avgTemp", "minTemp", "maxTemp", "prcp"])'
+        ),
+        "notebook must reject empty row sets before dataframe construction",
+    )
+
+
 def assert_completed_plan(path, label):
     assert_true(path.is_file(), "{0} plan must live under docs/plans".format(label))
     plan_text = path.read_text()
@@ -122,6 +144,7 @@ def test_completed_plans_are_in_docs_plans():
     assert_completed_plan(VALUE_GUARDS_PLAN_PATH, "weather notebook value guards")
     assert_completed_plan(FINITE_VALUES_PLAN_PATH, "weather notebook finite values")
     assert_completed_plan(RESPONSE_ROOT_PLAN_PATH, "weather notebook response root")
+    assert_completed_plan(EMPTY_ROWS_PLAN_PATH, "weather notebook empty rows")
 
 
 def main():
@@ -132,6 +155,7 @@ def main():
         test_notebook_has_no_stale_outputs,
         test_notebook_aligns_observations_by_date,
         test_notebook_guards_observation_dates_and_values,
+        test_notebook_rejects_empty_valid_observation_rows,
         test_completed_plans_are_in_docs_plans,
     ]
     for test in tests:

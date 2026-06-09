@@ -21,6 +21,7 @@ Priority:
 - Raise explicit errors for unexpected NOAA response roots
 - Guard malformed NOAA dates and numeric values before building rows
 - Reject NaN and infinite NOAA numeric values before plotting
+- Reject empty parsed observation sets before plotting
 - Avoid presenting historical data as current conditions
 
 Next priorities:

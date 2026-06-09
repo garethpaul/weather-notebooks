@@ -47,7 +47,8 @@ The setup commands above are derived from repository files. Legacy mobile, Pytho
 
 ## Testing and Verification
 
-- `make verify` runs static notebook reproducibility and token-safety checks.
+- `make verify` runs static notebook reproducibility, token-safety, date
+  alignment, and NOAA result-shape checks.
 - `make check` runs `make verify` with bytecode cleanup before and after.
 - `python3 scripts/check_weather_notebook_contracts.py` runs just the notebook contracts.
 - Completed maintenance plans live under `docs/plans` and are checked by
@@ -72,6 +73,8 @@ When the required SDK or runtime is unavailable, use static checks and source re
   current notebook reproducibility baseline.
 - See `docs/plans/2026-06-08-weather-notebook-date-alignment.md` for the NOAA
   datatype date-alignment contract.
+- See `docs/plans/2026-06-08-weather-notebook-result-shape.md` for NOAA JSON
+  result-shape handling.
 
 ## Contributing
 

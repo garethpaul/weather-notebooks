@@ -17,13 +17,14 @@ Priority:
 - Preserve the notebook analysis flow
 - Keep NOAA tokens as local user-provided values
 - Make station ID, date range, and unit conversions visible
+- Validate NOAA result shapes before converting observations
 - Avoid presenting historical data as current conditions
 
 Next priorities:
 
 - Add README setup notes and dependency requirements
-- Move API token loading to environment variables
 - Document station and date-range choices
+- Extract NOAA fetching into a testable Python module
 - Add data-source timestamps to generated outputs
 
 Contribution rules:

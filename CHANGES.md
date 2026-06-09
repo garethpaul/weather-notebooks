@@ -2,6 +2,8 @@
 
 ## 2026-06-08
 
+- Added explicit NOAA JSON result-shape checks before processing observation
+  rows.
 - Aligned NOAA datatype observations by date before constructing the weather dataframe.
 - Tightened docs-plan verification to require recorded `make check` evidence.
 - Loaded NOAA CDO API tokens from the `NOAA_TOKEN` environment variable instead of notebook literals.

@@ -8,6 +8,7 @@ ROOT = Path(__file__).resolve().parents[1]
 NOTEBOOK = ROOT / "Weather.ipynb"
 REPRODUCIBILITY_PLAN_PATH = ROOT / "docs" / "plans" / "2026-06-08-weather-notebook-reproducibility.md"
 DATE_ALIGNMENT_PLAN_PATH = ROOT / "docs" / "plans" / "2026-06-08-weather-notebook-date-alignment.md"
+DATA_SHAPE_PLAN_PATH = ROOT / "docs" / "plans" / "2026-06-08-weather-notebook-result-shape.md"
 
 
 def load_notebook():
@@ -41,6 +42,18 @@ def test_noaa_requests_are_parameterized_and_bounded():
     assert_true(".raise_for_status()" in source, "NOAA responses must fail fast on HTTP errors")
 
 
+def test_noaa_result_shape_is_checked():
+    source = notebook_source(load_notebook())
+    assert_true("payload = response.json()" in source, "NOAA response JSON must be captured before reading results")
+    assert_true("isinstance(payload, dict)" in source, "NOAA response root must be checked before dictionary access")
+    assert_true("isinstance(results, list)" in source, "NOAA results must be checked as a list")
+    assert_true(
+        'raise ValueError("NOAA results must be a list")' in source,
+        "NOAA result-shape errors must be explicit",
+    )
+    assert_true("if not isinstance(item, dict):" in source, "NOAA observation rows must skip non-dict items")
+
+
 def test_notebook_has_no_stale_outputs():
     notebook = load_notebook()
     for index, cell in enumerate(notebook.get("cells", [])):
@@ -71,12 +84,14 @@ def assert_completed_plan(path, label):
 def test_completed_plans_are_in_docs_plans():
     assert_completed_plan(REPRODUCIBILITY_PLAN_PATH, "weather notebook reproducibility")
     assert_completed_plan(DATE_ALIGNMENT_PLAN_PATH, "weather notebook date alignment")
+    assert_completed_plan(DATA_SHAPE_PLAN_PATH, "weather notebook result shape")
 
 
 def main():
     tests = [
         test_noaa_token_comes_from_environment,
         test_noaa_requests_are_parameterized_and_bounded,
+        test_noaa_result_shape_is_checked,
         test_notebook_has_no_stale_outputs,
         test_notebook_aligns_observations_by_date,
         test_completed_plans_are_in_docs_plans,

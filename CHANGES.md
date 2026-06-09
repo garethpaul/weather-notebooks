@@ -2,6 +2,8 @@
 
 ## 2026-06-09
 
+- Rejected NaN and infinite NOAA numeric values before unit conversion.
+- Added static checker coverage for finite NOAA observation values.
 - Added guarded NOAA timestamp and numeric value parsing before dataframe row
   construction.
 - Added static checker coverage for malformed observation date and value

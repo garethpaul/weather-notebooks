@@ -10,6 +10,7 @@ REPRODUCIBILITY_PLAN_PATH = ROOT / "docs" / "plans" / "2026-06-08-weather-notebo
 DATE_ALIGNMENT_PLAN_PATH = ROOT / "docs" / "plans" / "2026-06-08-weather-notebook-date-alignment.md"
 DATA_SHAPE_PLAN_PATH = ROOT / "docs" / "plans" / "2026-06-08-weather-notebook-result-shape.md"
 VALUE_GUARDS_PLAN_PATH = ROOT / "docs" / "plans" / "2026-06-09-weather-notebook-value-guards.md"
+FINITE_VALUES_PLAN_PATH = ROOT / "docs" / "plans" / "2026-06-09-weather-notebook-finite-values.md"
 
 
 def load_notebook():
@@ -91,6 +92,11 @@ def test_notebook_guards_observation_dates_and_values():
     assert_true('"date": parsed_date' in source, "row building must use the guarded date value")
     assert_true("def noaa_number(value):" in source, "notebook must convert NOAA numeric values through a guard helper")
     assert_true("number = noaa_number(value)" in source, "unit conversion must use guarded numeric conversion")
+    assert_true("import math" in source, "notebook must import math for finite numeric checks")
+    assert_true(
+        "if not math.isfinite(number):" in source,
+        "NOAA numeric parsing must reject NaN and infinite values",
+    )
     assert_true("return number / 10.0 * 1.8 + 32" in source, "temperature conversion must use guarded numeric values")
     assert_true("return number / 25.54" in source, "precipitation conversion must use guarded numeric values")
 
@@ -107,6 +113,7 @@ def test_completed_plans_are_in_docs_plans():
     assert_completed_plan(DATE_ALIGNMENT_PLAN_PATH, "weather notebook date alignment")
     assert_completed_plan(DATA_SHAPE_PLAN_PATH, "weather notebook result shape")
     assert_completed_plan(VALUE_GUARDS_PLAN_PATH, "weather notebook value guards")
+    assert_completed_plan(FINITE_VALUES_PLAN_PATH, "weather notebook finite values")
 
 
 def main():

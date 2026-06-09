@@ -2,6 +2,7 @@
 
 ## 2026-06-08
 
+- Aligned NOAA datatype observations by date before constructing the weather dataframe.
 - Tightened docs-plan verification to require recorded `make check` evidence.
 - Loaded NOAA CDO API tokens from the `NOAA_TOKEN` environment variable instead of notebook literals.
 - Added structured NOAA request parameters, HTTP error checks, and bounded request timeouts.

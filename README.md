@@ -70,6 +70,8 @@ When the required SDK or runtime is unavailable, use static checks and source re
 - See `VISION.md` for project direction and contribution guardrails.
 - See `docs/plans/2026-06-08-weather-notebook-reproducibility.md` for the
   current notebook reproducibility baseline.
+- See `docs/plans/2026-06-08-weather-notebook-date-alignment.md` for the NOAA
+  datatype date-alignment contract.
 
 ## Contributing
 

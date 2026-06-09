@@ -2,6 +2,8 @@
 
 ## 2026-06-09
 
+- Raised an explicit error when NOAA returns a non-object JSON response root.
+- Added static checker coverage for NOAA response root-shape failures.
 - Rejected NaN and infinite NOAA numeric values before unit conversion.
 - Added static checker coverage for finite NOAA observation values.
 - Added guarded NOAA timestamp and numeric value parsing before dataframe row

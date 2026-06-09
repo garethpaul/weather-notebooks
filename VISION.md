@@ -18,6 +18,7 @@ Priority:
 - Keep NOAA tokens as local user-provided values
 - Make station ID, date range, and unit conversions visible
 - Validate NOAA result shapes before converting observations
+- Raise explicit errors for unexpected NOAA response roots
 - Guard malformed NOAA dates and numeric values before building rows
 - Reject NaN and infinite NOAA numeric values before plotting
 - Avoid presenting historical data as current conditions

@@ -11,6 +11,9 @@ DATE_ALIGNMENT_PLAN_PATH = ROOT / "docs" / "plans" / "2026-06-08-weather-noteboo
 DATA_SHAPE_PLAN_PATH = ROOT / "docs" / "plans" / "2026-06-08-weather-notebook-result-shape.md"
 VALUE_GUARDS_PLAN_PATH = ROOT / "docs" / "plans" / "2026-06-09-weather-notebook-value-guards.md"
 FINITE_VALUES_PLAN_PATH = ROOT / "docs" / "plans" / "2026-06-09-weather-notebook-finite-values.md"
+RESPONSE_ROOT_PLAN_PATH = (
+    ROOT / "docs" / "plans" / "2026-06-09-weather-notebook-response-root.md"
+)
 
 
 def load_notebook():
@@ -48,6 +51,10 @@ def test_noaa_result_shape_is_checked():
     source = notebook_source(load_notebook())
     assert_true("payload = response.json()" in source, "NOAA response JSON must be captured before reading results")
     assert_true("isinstance(payload, dict)" in source, "NOAA response root must be checked before dictionary access")
+    assert_true(
+        'raise ValueError("NOAA response must be an object")' in source,
+        "NOAA response root-shape errors must be explicit",
+    )
     assert_true("isinstance(results, list)" in source, "NOAA results must be checked as a list")
     assert_true(
         'raise ValueError("NOAA results must be a list")' in source,
@@ -114,6 +121,7 @@ def test_completed_plans_are_in_docs_plans():
     assert_completed_plan(DATA_SHAPE_PLAN_PATH, "weather notebook result shape")
     assert_completed_plan(VALUE_GUARDS_PLAN_PATH, "weather notebook value guards")
     assert_completed_plan(FINITE_VALUES_PLAN_PATH, "weather notebook finite values")
+    assert_completed_plan(RESPONSE_ROOT_PLAN_PATH, "weather notebook response root")
 
 
 def main():

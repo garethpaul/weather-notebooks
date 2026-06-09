@@ -48,7 +48,7 @@ The setup commands above are derived from repository files. Legacy mobile, Pytho
 ## Testing and Verification
 
 - `make verify` runs static notebook reproducibility, token-safety, date
-  alignment, NOAA result-shape, finite numeric value, and observation
+  alignment, NOAA root/result-shape, finite numeric value, and observation
   value-guard checks.
 - `make check` runs `make verify` with bytecode cleanup before and after.
 - `python3 scripts/check_weather_notebook_contracts.py` runs just the notebook contracts.
@@ -80,6 +80,8 @@ When the required SDK or runtime is unavailable, use static checks and source re
   NOAA date and numeric value handling.
 - See `docs/plans/2026-06-09-weather-notebook-finite-values.md` for NaN and
   infinite NOAA numeric value handling.
+- See `docs/plans/2026-06-09-weather-notebook-response-root.md` for explicit
+  NOAA response root-shape errors.
 
 ## Contributing
 

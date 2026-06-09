@@ -17,6 +17,9 @@ RESPONSE_ROOT_PLAN_PATH = (
 EMPTY_ROWS_PLAN_PATH = (
     ROOT / "docs" / "plans" / "2026-06-09-weather-notebook-empty-rows.md"
 )
+MEASUREMENT_ROWS_PLAN_PATH = (
+    ROOT / "docs" / "plans" / "2026-06-09-weather-notebook-measurement-rows.md"
+)
 
 
 def load_notebook():
@@ -130,6 +133,45 @@ def test_notebook_rejects_empty_valid_observation_rows():
     )
 
 
+def test_notebook_skips_rows_without_measurements():
+    source = notebook_source(load_notebook())
+    assert_true(
+        'avg_temp = tenths_c_to_f(values.get("TAVG"))' in source,
+        "row building must store converted average temperature before append",
+    )
+    assert_true(
+        'min_temp = tenths_c_to_f(values.get("TMIN"))' in source,
+        "row building must store converted minimum temperature before append",
+    )
+    assert_true(
+        'max_temp = tenths_c_to_f(values.get("TMAX"))' in source,
+        "row building must store converted maximum temperature before append",
+    )
+    assert_true(
+        'precipitation = mm_to_inches(values.get("PRCP"))' in source,
+        "row building must store converted precipitation before append",
+    )
+    assert_true(
+        "if all(value is None for value in (avg_temp, min_temp, max_temp, precipitation)):" in source,
+        "notebook must skip rows without any converted measurements",
+    )
+    assert_true(
+        source.index("if all(value is None for value in (avg_temp, min_temp, max_temp, precipitation)):")
+        < source.index("rows.append({"),
+        "measurement-empty row guard must run before appending dataframe rows",
+    )
+    for field, variable in (
+        ('"avgTemp"', "avg_temp"),
+        ('"minTemp"', "min_temp"),
+        ('"maxTemp"', "max_temp"),
+        ('"prcp"', "precipitation"),
+    ):
+        assert_true(
+            "{0}: {1}".format(field, variable) in source,
+            "dataframe rows must use guarded {0} values".format(field),
+        )
+
+
 def assert_completed_plan(path, label):
     assert_true(path.is_file(), "{0} plan must live under docs/plans".format(label))
     plan_text = path.read_text()
@@ -145,6 +187,7 @@ def test_completed_plans_are_in_docs_plans():
     assert_completed_plan(FINITE_VALUES_PLAN_PATH, "weather notebook finite values")
     assert_completed_plan(RESPONSE_ROOT_PLAN_PATH, "weather notebook response root")
     assert_completed_plan(EMPTY_ROWS_PLAN_PATH, "weather notebook empty rows")
+    assert_completed_plan(MEASUREMENT_ROWS_PLAN_PATH, "weather notebook measurement rows")
 
 
 def main():
@@ -156,6 +199,7 @@ def main():
         test_notebook_aligns_observations_by_date,
         test_notebook_guards_observation_dates_and_values,
         test_notebook_rejects_empty_valid_observation_rows,
+        test_notebook_skips_rows_without_measurements,
         test_completed_plans_are_in_docs_plans,
     ]
     for test in tests:

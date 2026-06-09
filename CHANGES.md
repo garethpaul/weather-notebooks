@@ -2,6 +2,9 @@
 
 ## 2026-06-09
 
+- Skipped date-valid NOAA rows when every converted measurement value is
+  missing or malformed before dataframe construction.
+- Added static checker coverage for measurement-empty row filtering.
 - Raised an explicit error when NOAA returns a non-object JSON response root.
 - Added static checker coverage for NOAA response root-shape failures.
 - Raised an explicit error when no valid NOAA observations remain after parsing.

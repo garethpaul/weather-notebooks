@@ -23,6 +23,9 @@ MEASUREMENT_ROWS_PLAN_PATH = (
 OBSERVATION_KEYS_PLAN_PATH = (
     ROOT / "docs" / "plans" / "2026-06-09-weather-notebook-observation-keys.md"
 )
+TOKEN_WHITESPACE_PLAN_PATH = (
+    ROOT / "docs" / "plans" / "2026-06-09-weather-notebook-token-whitespace.md"
+)
 
 
 def load_notebook():
@@ -45,6 +48,10 @@ def test_noaa_token_comes_from_environment():
     source = notebook_source(load_notebook())
     assert_true("NOAA_TOKEN" in source, "notebook must reference NOAA_TOKEN")
     assert_true("os.environ" in source, "notebook must load token from the environment")
+    assert_true(
+        'os.environ.get("NOAA_TOKEN", "").strip()' in source,
+        "notebook must strip whitespace around NOAA_TOKEN before validation",
+    )
     assert_true("token = 'XXX'" not in source, "notebook must not keep a hardcoded token placeholder")
     assert_true('token = "XXX"' not in source, "notebook must not keep a hardcoded token placeholder")
 
@@ -206,6 +213,7 @@ def test_completed_plans_are_in_docs_plans():
     assert_completed_plan(EMPTY_ROWS_PLAN_PATH, "weather notebook empty rows")
     assert_completed_plan(MEASUREMENT_ROWS_PLAN_PATH, "weather notebook measurement rows")
     assert_completed_plan(OBSERVATION_KEYS_PLAN_PATH, "weather notebook observation keys")
+    assert_completed_plan(TOKEN_WHITESPACE_PLAN_PATH, "weather notebook token whitespace")
 
 
 def main():

@@ -2,6 +2,9 @@
 
 ## 2026-06-09
 
+- Trimmed `NOAA_TOKEN` before validation so blank or whitespace-only token
+  values fail before requests are made.
+- Added static checker coverage for NOAA token whitespace normalization.
 - Rejected non-text NOAA observation `date` and `datatype` values before
   supported-datatype checks and date bucketing.
 - Added static checker coverage for observation key type guards.

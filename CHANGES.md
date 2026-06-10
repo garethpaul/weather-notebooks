@@ -1,5 +1,12 @@
 # Changes
 
+## 2026-06-10
+
+- Pinned the current stable Jupyter, Matplotlib, NumPy, pandas, and Requests
+  releases after direct OSV checks returned no advisories.
+- Added pinned, read-only Python 3.12/3.14 CI that installs and imports the
+  scientific stack before running offline notebook contracts.
+
 ## 2026-06-09
 
 - Trimmed `NOAA_TOKEN` before validation so blank or whitespace-only token

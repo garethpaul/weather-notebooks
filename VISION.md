@@ -26,6 +26,7 @@ Priority:
 - Reject empty parsed observation sets before plotting
 - Skip date-valid rows that have no usable converted measurements
 - Avoid presenting historical data as current conditions
+- Keep the scientific environment exactly pinned and import-verified in CI
 
 Next priorities:
 

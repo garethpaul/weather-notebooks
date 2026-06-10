@@ -26,7 +26,8 @@ Helpful reports include:
 
 - This repository appears to be a data science notebook project. The active security scope is the code and documentation on the default branch.
 - The repository scan did not identify production authentication, payment, or secret-management code. Treat the project as public sample code unless future changes add sensitive surfaces.
-- No primary dependency manifest was detected in the repository root. If dependencies are added later, include a manifest and prefer reproducible installation instructions.
+- Direct notebook dependencies are exactly pinned in `requirements.txt` and
+  installed in hosted CI before offline contracts run.
 
 ## Data and Notebook Notes
 

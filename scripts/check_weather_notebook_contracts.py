@@ -26,6 +26,10 @@ OBSERVATION_KEYS_PLAN_PATH = (
 TOKEN_WHITESPACE_PLAN_PATH = (
     ROOT / "docs" / "plans" / "2026-06-09-weather-notebook-token-whitespace.md"
 )
+DEPENDENCY_PLAN_PATH = (
+    ROOT / "docs" / "plans" / "2026-06-10-dependency-reproducibility.md"
+)
+CI_WORKFLOW_PATH = ROOT / ".github" / "workflows" / "check.yml"
 
 
 def load_notebook():
@@ -214,6 +218,32 @@ def test_completed_plans_are_in_docs_plans():
     assert_completed_plan(MEASUREMENT_ROWS_PLAN_PATH, "weather notebook measurement rows")
     assert_completed_plan(OBSERVATION_KEYS_PLAN_PATH, "weather notebook observation keys")
     assert_completed_plan(TOKEN_WHITESPACE_PLAN_PATH, "weather notebook token whitespace")
+    assert_completed_plan(DEPENDENCY_PLAN_PATH, "weather notebook dependency reproducibility")
+
+
+def test_dependency_and_ci_contracts():
+    requirements = (ROOT / "requirements.txt").read_text()
+    for requirement in (
+            "jupyter==1.1.1",
+            "matplotlib==3.10.9",
+            "numpy==2.4.6",
+            "pandas==3.0.3",
+            "requests==2.34.2"):
+        assert_true(requirement in requirements, "missing exact dependency pin {0}".format(requirement))
+    assert_true(">=" not in requirements, "direct notebook dependencies must be exact pins")
+
+    workflow = CI_WORKFLOW_PATH.read_text()
+    for contract in (
+            "permissions:\n  contents: read",
+            "timeout-minutes: 15",
+            'python-version: ["3.12", "3.14"]',
+            "actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10",
+            "actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405",
+            "python -m pip install -r requirements.txt",
+            "import jupyter, matplotlib, numpy, pandas, requests",
+            "run: make check"):
+        assert_true(contract in workflow, "missing CI contract {0}".format(contract))
+    assert_true("@v" not in workflow, "CI actions must use immutable commits")
 
 
 def main():
@@ -228,6 +258,7 @@ def main():
         test_notebook_rejects_empty_valid_observation_rows,
         test_notebook_skips_rows_without_measurements,
         test_completed_plans_are_in_docs_plans,
+        test_dependency_and_ci_contracts,
     ]
     for test in tests:
         test()

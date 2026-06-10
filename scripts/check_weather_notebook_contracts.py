@@ -32,6 +32,9 @@ DEPENDENCY_PLAN_PATH = (
 PAGINATION_PLAN_PATH = (
     ROOT / "docs" / "plans" / "2026-06-10-noaa-pagination.md"
 )
+METRIC_UNITS_PLAN_PATH = (
+    ROOT / "docs" / "plans" / "2026-06-10-noaa-metric-units.md"
+)
 CI_WORKFLOW_PATH = ROOT / ".github" / "workflows" / "check.yml"
 
 
@@ -68,6 +71,18 @@ def test_noaa_requests_are_parameterized_and_bounded():
     assert_true("params=" in source, "NOAA requests must use structured query parameters")
     assert_true("timeout=REQUEST_TIMEOUT_SECONDS" in source, "NOAA requests must set a timeout")
     assert_true(".raise_for_status()" in source, "NOAA responses must fail fast on HTTP errors")
+
+
+def test_noaa_metric_units_are_explicit_and_converted():
+    source = notebook_source(load_notebook())
+    assert_true('"units": "metric"' in source, "NOAA requests must explicitly request scaled metric values")
+    assert_true("def c_to_f(value):" in source, "temperature conversion must accept metric Celsius values")
+    assert_true("return number * 1.8 + 32" in source, "Celsius values must convert to Fahrenheit without raw-data scaling")
+    assert_true("return number / 25.4" in source, "millimeters must convert to inches with the exact divisor")
+    assert_true("tenths_c_to_f" not in source, "metric NOAA values must not use raw tenths-Celsius conversion")
+    assert_true("number / 25.54" not in source, "precipitation conversion must not use an incorrect divisor")
+    for measurement in ("avg_temp", "min_temp", "max_temp"):
+        assert_true("{0} = c_to_f(".format(measurement) in source, "{0} must use metric temperature conversion".format(measurement))
 
 
 def test_noaa_requests_are_paginated_with_a_safety_bound():
@@ -160,8 +175,8 @@ def test_notebook_guards_observation_dates_and_values():
         "if not math.isfinite(number):" in source,
         "NOAA numeric parsing must reject NaN and infinite values",
     )
-    assert_true("return number / 10.0 * 1.8 + 32" in source, "temperature conversion must use guarded numeric values")
-    assert_true("return number / 25.54" in source, "precipitation conversion must use guarded numeric values")
+    assert_true("return number * 1.8 + 32" in source, "temperature conversion must use guarded numeric values")
+    assert_true("return number / 25.4" in source, "precipitation conversion must use guarded numeric values")
 
 
 def test_notebook_rejects_empty_valid_observation_rows():
@@ -186,15 +201,15 @@ def test_notebook_rejects_empty_valid_observation_rows():
 def test_notebook_skips_rows_without_measurements():
     source = notebook_source(load_notebook())
     assert_true(
-        'avg_temp = tenths_c_to_f(values.get("TAVG"))' in source,
+        'avg_temp = c_to_f(values.get("TAVG"))' in source,
         "row building must store converted average temperature before append",
     )
     assert_true(
-        'min_temp = tenths_c_to_f(values.get("TMIN"))' in source,
+        'min_temp = c_to_f(values.get("TMIN"))' in source,
         "row building must store converted minimum temperature before append",
     )
     assert_true(
-        'max_temp = tenths_c_to_f(values.get("TMAX"))' in source,
+        'max_temp = c_to_f(values.get("TMAX"))' in source,
         "row building must store converted maximum temperature before append",
     )
     assert_true(
@@ -242,6 +257,7 @@ def test_completed_plans_are_in_docs_plans():
     assert_completed_plan(TOKEN_WHITESPACE_PLAN_PATH, "weather notebook token whitespace")
     assert_completed_plan(DEPENDENCY_PLAN_PATH, "weather notebook dependency reproducibility")
     assert_completed_plan(PAGINATION_PLAN_PATH, "NOAA pagination")
+    assert_completed_plan(METRIC_UNITS_PLAN_PATH, "NOAA metric units")
 
 
 def test_dependency_and_ci_contracts():
@@ -284,6 +300,7 @@ def main():
     tests = [
         test_noaa_token_comes_from_environment,
         test_noaa_requests_are_parameterized_and_bounded,
+        test_noaa_metric_units_are_explicit_and_converted,
         test_noaa_requests_are_paginated_with_a_safety_bound,
         test_noaa_result_shape_is_checked,
         test_notebook_has_no_stale_outputs,

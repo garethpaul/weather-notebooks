@@ -18,6 +18,7 @@ Priority:
 - Keep NOAA tokens as local user-provided values
 - Reject blank or whitespace-only NOAA token values before requests
 - Make station ID, date range, and unit conversions visible
+- Request explicit NOAA metric scaling before display-unit conversion
 - Validate NOAA result shapes before converting observations
 - Fetch complete NOAA result pages within an explicit request safety bound
 - Raise explicit errors for unexpected NOAA response roots

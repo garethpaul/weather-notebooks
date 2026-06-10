@@ -44,6 +44,8 @@ The setup commands above are derived from repository files. Legacy mobile, Pytho
 
 - Run `jupyter notebook Weather.ipynb` after installing dependencies and setting `NOAA_TOKEN`.
 - The notebook fetches NOAA CDO observations for station `GHCND:US1CAMR0037` across the configured date range.
+- NOAA requests explicitly use metric units; Celsius temperatures and
+  millimeter precipitation are converted for Fahrenheit/inch presentation.
 - NOAA result sets are fetched in 1,000-row pages with a 20-page safety limit
   per request group; exhausting the limit raises instead of silently truncating.
 
@@ -51,8 +53,8 @@ The setup commands above are derived from repository files. Legacy mobile, Pytho
 
 - `make verify` runs static notebook reproducibility, token-safety, date
   alignment, NOAA root/result-shape, observation key, finite numeric value,
-  observation value-guard, token whitespace, pagination, measurement-row, and
-  empty-row checks.
+  observation value-guard, token whitespace, metric-unit conversion,
+  pagination, measurement-row, and empty-row checks.
 - `make check` runs `make verify` with bytecode cleanup before and after.
 - GitHub Actions installs the exact scientific stack and runs offline contracts
   on Python 3.12 and 3.14 on Ubuntu 24.04 with read-only permissions, immutable
@@ -102,6 +104,8 @@ When the required SDK or runtime is unavailable, use static checks and source re
   stack pins and hosted import verification.
 - See `docs/plans/2026-06-10-noaa-pagination.md` for bounded NOAA result
   pagination and explicit safety-limit failure.
+- See `docs/plans/2026-06-10-noaa-metric-units.md` for explicit NOAA unit
+  scaling and corrected display conversions.
 
 ## Contributing
 

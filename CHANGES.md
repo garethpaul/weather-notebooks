@@ -2,6 +2,8 @@
 
 ## 2026-06-10
 
+- Requested scaled metric NOAA values explicitly and corrected Celsius and
+  millimeter conversions, including the precipitation inches divisor.
 - Added bounded NOAA offset pagination so result sets larger than 1,000 rows
   are complete and a 20-page safety-limit exhaustion fails explicitly.
 - Made Make execution root-independent and fixed hosted checks to Ubuntu 24.04

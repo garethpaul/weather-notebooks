@@ -44,16 +44,19 @@ The setup commands above are derived from repository files. Legacy mobile, Pytho
 
 - Run `jupyter notebook Weather.ipynb` after installing dependencies and setting `NOAA_TOKEN`.
 - The notebook fetches NOAA CDO observations for station `GHCND:US1CAMR0037` across the configured date range.
+- NOAA result sets are fetched in 1,000-row pages with a 20-page safety limit
+  per request group; exhausting the limit raises instead of silently truncating.
 
 ## Testing and Verification
 
 - `make verify` runs static notebook reproducibility, token-safety, date
   alignment, NOAA root/result-shape, observation key, finite numeric value,
-  observation value-guard, token whitespace, measurement-row, and empty-row
-  checks.
+  observation value-guard, token whitespace, pagination, measurement-row, and
+  empty-row checks.
 - `make check` runs `make verify` with bytecode cleanup before and after.
 - GitHub Actions installs the exact scientific stack and runs offline contracts
-  on Python 3.12 and 3.14 with read-only permissions and immutable action pins.
+  on Python 3.12 and 3.14 on Ubuntu 24.04 with read-only permissions, immutable
+  action pins, and cancellation for superseded runs.
 - `python3 scripts/check_weather_notebook_contracts.py` runs just the notebook contracts.
 - Completed maintenance plans live under `docs/plans` and are checked by
   `make check`.
@@ -97,6 +100,8 @@ When the required SDK or runtime is unavailable, use static checks and source re
   trimming and rejecting blank NOAA token environment values before requests.
 - See `docs/plans/2026-06-10-dependency-reproducibility.md` for exact scientific
   stack pins and hosted import verification.
+- See `docs/plans/2026-06-10-noaa-pagination.md` for bounded NOAA result
+  pagination and explicit safety-limit failure.
 
 ## Contributing
 

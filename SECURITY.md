@@ -36,6 +36,8 @@ For notebooks or data-processing workflows, report unsafe parsing, path traversa
 NOAA observation rows should reject malformed or non-text date and datatype
 keys before bucketing or conversion. Reports involving malformed API payloads
 should include a minimal synthetic response rather than live private data.
+NOAA result pagination is capped at 20,000 rows per request group so an
+unexpected upstream response cannot cause unbounded API calls or accumulation.
 
 ## Dependency and Supply Chain Security
 

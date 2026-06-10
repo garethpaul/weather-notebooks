@@ -19,6 +19,7 @@ Priority:
 - Reject blank or whitespace-only NOAA token values before requests
 - Make station ID, date range, and unit conversions visible
 - Validate NOAA result shapes before converting observations
+- Fetch complete NOAA result pages within an explicit request safety bound
 - Raise explicit errors for unexpected NOAA response roots
 - Reject non-text NOAA observation date and datatype keys before bucketing
 - Guard malformed NOAA dates and numeric values before building rows

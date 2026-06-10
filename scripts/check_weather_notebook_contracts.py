@@ -29,6 +29,9 @@ TOKEN_WHITESPACE_PLAN_PATH = (
 DEPENDENCY_PLAN_PATH = (
     ROOT / "docs" / "plans" / "2026-06-10-dependency-reproducibility.md"
 )
+PAGINATION_PLAN_PATH = (
+    ROOT / "docs" / "plans" / "2026-06-10-noaa-pagination.md"
+)
 CI_WORKFLOW_PATH = ROOT / ".github" / "workflows" / "check.yml"
 
 
@@ -65,6 +68,25 @@ def test_noaa_requests_are_parameterized_and_bounded():
     assert_true("params=" in source, "NOAA requests must use structured query parameters")
     assert_true("timeout=REQUEST_TIMEOUT_SECONDS" in source, "NOAA requests must set a timeout")
     assert_true(".raise_for_status()" in source, "NOAA responses must fail fast on HTTP errors")
+
+
+def test_noaa_requests_are_paginated_with_a_safety_bound():
+    source = notebook_source(load_notebook())
+    for contract in (
+            "NOAA_PAGE_LIMIT = 1000",
+            "MAX_NOAA_PAGES = 20",
+            "for page_index in range(MAX_NOAA_PAGES):",
+            '"offset": page_index * NOAA_PAGE_LIMIT + 1',
+            "all_results.extend(results)",
+            "if len(results) < NOAA_PAGE_LIMIT:",
+            "return all_results",
+            'raise ValueError("NOAA response exceeded the page safety limit")'):
+        assert_true(contract in source, "missing NOAA pagination contract {0}".format(contract))
+    assert_true(
+        source.index('"offset": page_index * NOAA_PAGE_LIMIT + 1')
+        < source.index("response = requests.get("),
+        "NOAA offset must be included before each request",
+    )
 
 
 def test_noaa_result_shape_is_checked():
@@ -219,6 +241,7 @@ def test_completed_plans_are_in_docs_plans():
     assert_completed_plan(OBSERVATION_KEYS_PLAN_PATH, "weather notebook observation keys")
     assert_completed_plan(TOKEN_WHITESPACE_PLAN_PATH, "weather notebook token whitespace")
     assert_completed_plan(DEPENDENCY_PLAN_PATH, "weather notebook dependency reproducibility")
+    assert_completed_plan(PAGINATION_PLAN_PATH, "NOAA pagination")
 
 
 def test_dependency_and_ci_contracts():
@@ -235,6 +258,9 @@ def test_dependency_and_ci_contracts():
     workflow = CI_WORKFLOW_PATH.read_text()
     for contract in (
             "permissions:\n  contents: read",
+            "concurrency:",
+            "cancel-in-progress: true",
+            "runs-on: ubuntu-24.04",
             "timeout-minutes: 15",
             'python-version: ["3.12", "3.14"]',
             "actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10",
@@ -244,12 +270,21 @@ def test_dependency_and_ci_contracts():
             "run: make check"):
         assert_true(contract in workflow, "missing CI contract {0}".format(contract))
     assert_true("@v" not in workflow, "CI actions must use immutable commits")
+    assert_true("ubuntu-latest" not in workflow, "CI must not use a floating Ubuntu runner")
+    assert_true("# v6.0.3" in workflow, "checkout pin annotation must identify the exact release")
+    assert_true("# v6.2.0" in workflow, "setup-python pin annotation must identify the exact release")
+
+    makefile = (ROOT / "Makefile").read_text()
+    assert_true("ROOT := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))" in makefile, "Makefile must resolve the repository root")
+    assert_true("$(ROOT)/scripts/check_weather_notebook_contracts.py" in makefile, "Makefile must use the rooted contract path")
+    assert_true('find "$(ROOT)"' in makefile, "Makefile cleanup must stay inside the repository")
 
 
 def main():
     tests = [
         test_noaa_token_comes_from_environment,
         test_noaa_requests_are_parameterized_and_bounded,
+        test_noaa_requests_are_paginated_with_a_safety_bound,
         test_noaa_result_shape_is_checked,
         test_notebook_has_no_stale_outputs,
         test_notebook_aligns_observations_by_date,

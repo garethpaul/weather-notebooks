@@ -26,6 +26,8 @@ OBSERVATION_KEYS_PLAN_PATH = (
 TOKEN_WHITESPACE_PLAN_PATH = (
     ROOT / "docs" / "plans" / "2026-06-09-weather-notebook-token-whitespace.md"
 )
+CI_PLAN_PATH = ROOT / "docs" / "plans" / "2026-06-10-ci-baseline.md"
+CI_WORKFLOW_PATH = ROOT / ".github" / "workflows" / "check.yml"
 
 
 def load_notebook():
@@ -214,6 +216,19 @@ def test_completed_plans_are_in_docs_plans():
     assert_completed_plan(MEASUREMENT_ROWS_PLAN_PATH, "weather notebook measurement rows")
     assert_completed_plan(OBSERVATION_KEYS_PLAN_PATH, "weather notebook observation keys")
     assert_completed_plan(TOKEN_WHITESPACE_PLAN_PATH, "weather notebook token whitespace")
+    assert_completed_plan(CI_PLAN_PATH, "weather notebook CI baseline")
+
+
+def test_ci_baseline_is_documented():
+    workflow = CI_WORKFLOW_PATH.read_text()
+    assert_true("uses: actions/checkout@v4" in workflow, "CI workflow must check out the repository")
+    assert_true("uses: actions/setup-python@v5" in workflow, "CI workflow must set up Python")
+    assert_true("run: make check" in workflow, "CI workflow must run make check")
+    for docs_file in ("README.md", "VISION.md", "SECURITY.md", "CHANGES.md"):
+        assert_true(
+            "GitHub Actions" in (ROOT / docs_file).read_text(),
+            "{0} must document the GitHub Actions baseline".format(docs_file),
+        )
 
 
 def main():
@@ -228,6 +243,7 @@ def main():
         test_notebook_rejects_empty_valid_observation_rows,
         test_notebook_skips_rows_without_measurements,
         test_completed_plans_are_in_docs_plans,
+        test_ci_baseline_is_documented,
     ]
     for test in tests:
         test()

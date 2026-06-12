@@ -1,5 +1,13 @@
 # Changes
 
+## 2026-06-10
+
+- Added a GitHub Actions check workflow that runs the existing offline
+  `make check` notebook contract baseline on pushes, pull requests, and manual
+  dispatches.
+- Added static checker coverage requiring the CI workflow and completed CI
+  baseline plan to remain checked in.
+
 ## 2026-06-09
 
 - Trimmed `NOAA_TOKEN` before validation so blank or whitespace-only token

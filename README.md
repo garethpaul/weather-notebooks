@@ -52,6 +52,9 @@ The setup commands above are derived from repository files. Legacy mobile, Pytho
   observation value-guard, token whitespace, measurement-row, and empty-row
   checks.
 - `make check` runs `make verify` with bytecode cleanup before and after.
+- GitHub Actions runs the same offline `make check` baseline through
+  `.github/workflows/check.yml` on pushes, pull requests, and manual
+  dispatches.
 - `python3 scripts/check_weather_notebook_contracts.py` runs just the notebook contracts.
 - Completed maintenance plans live under `docs/plans` and are checked by
   `make check`.
@@ -93,6 +96,7 @@ When the required SDK or runtime is unavailable, use static checks and source re
   rejecting non-text NOAA observation date and datatype keys before bucketing.
 - See `docs/plans/2026-06-09-weather-notebook-token-whitespace.md` for
   trimming and rejecting blank NOAA token environment values before requests.
+- See `docs/plans/2026-06-10-ci-baseline.md` for the GitHub Actions baseline.
 
 ## Contributing
 

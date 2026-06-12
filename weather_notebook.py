@@ -13,6 +13,20 @@ SUPPORTED_DATATYPES = {"TAVG", "TMIN", "TMAX", "PRCP"}
 
 def fetch_noaa_data(year, datatype_ids, token, station_id, requests_get=None):
     requests_get = requests_get or requests.get
+    if isinstance(year, bool) or not isinstance(year, int) or year < 1000 or year > 9999:
+        raise ValueError("year must be a four-digit integer")
+    if not isinstance(datatype_ids, (list, tuple)) or not datatype_ids:
+        raise ValueError("datatype_ids must contain supported datatypes")
+    if any(not isinstance(datatype, str) or datatype not in SUPPORTED_DATATYPES for datatype in datatype_ids):
+        raise ValueError("datatype_ids must contain only supported datatypes")
+    if not isinstance(token, str) or not token.strip():
+        raise ValueError("token must be nonblank text")
+    if not isinstance(station_id, str) or not station_id.strip():
+        raise ValueError("station_id must be nonblank text")
+
+    datatype_ids = list(datatype_ids)
+    token = token.strip()
+    station_id = station_id.strip()
     all_results = []
     for page_index in range(MAX_NOAA_PAGES):
         params = {

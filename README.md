@@ -79,7 +79,8 @@ When the required SDK or runtime is unavailable, use static checks and source re
 
 - `NOAA_TOKEN` is required to fetch NOAA Climate Data Online data. Keep it in
   your local environment and out of git; blank or whitespace-only values are
-  rejected before requests are made.
+  rejected before requests are made. The reusable fetch helper also rejects
+  invalid years, datatypes, and station identifiers before network use.
 - Do not commit NOAA API tokens, private datasets, or refreshed outputs without source dates.
 
 ## Security and Privacy Notes
@@ -117,6 +118,8 @@ When the required SDK or runtime is unavailable, use static checks and source re
   pagination and explicit safety-limit failure.
 - See `docs/plans/2026-06-10-noaa-metric-units.md` for explicit NOAA unit
   scaling and corrected display conversions.
+- See `docs/plans/2026-06-12-noaa-request-input-validation.md` for fail-fast
+  validation and normalization at the reusable NOAA request boundary.
 
 ## Contributing
 

@@ -40,6 +40,9 @@ PAGINATION_PLAN_PATH = (
 METRIC_UNITS_PLAN_PATH = (
     ROOT / "docs" / "plans" / "2026-06-10-noaa-metric-units.md"
 )
+REQUEST_INPUT_PLAN_PATH = (
+    ROOT / "docs" / "plans" / "2026-06-12-noaa-request-input-validation.md"
+)
 CI_WORKFLOW_PATH = ROOT / ".github" / "workflows" / "check.yml"
 LOCKFILE_SHA256 = {
     "requirements-py312.lock": "47835a6609db0175be86dd3054e5e2334668b35cf0d0d59e45208ef2fc716179",
@@ -131,6 +134,36 @@ def test_noaa_requests_are_parameterized_and_bounded():
     assert_true("params=" in source, "NOAA requests must use structured query parameters")
     assert_true("timeout=REQUEST_TIMEOUT_SECONDS" in source, "NOAA requests must set a timeout")
     assert_true(".raise_for_status()" in source, "NOAA responses must fail fast on HTTP errors")
+
+
+def test_noaa_request_inputs_are_validated_before_network_use():
+    source = RUNTIME_MODULE.read_text()
+    function = source.split("def fetch_noaa_data", 1)[1].split("def record_observation", 1)[0]
+    request_index = function.index("response = requests_get(")
+    for contract in (
+        "isinstance(year, bool)",
+        "not isinstance(year, int)",
+        "year < 1000 or year > 9999",
+        "not isinstance(datatype_ids, (list, tuple)) or not datatype_ids",
+        "datatype not in SUPPORTED_DATATYPES",
+        "not isinstance(token, str) or not token.strip()",
+        "not isinstance(station_id, str) or not station_id.strip()",
+        "datatype_ids = list(datatype_ids)",
+        "token = token.strip()",
+        "station_id = station_id.strip()",
+    ):
+        assert_true(contract in function, "NOAA request validation must include {0!r}".format(contract))
+        assert_true(function.index(contract) < request_index, "NOAA request validation must run before network use")
+
+    tests = RUNTIME_TESTS.read_text()
+    assert_true(
+        "test_fetch_rejects_invalid_inputs_before_request" in tests,
+        "runtime tests must reject malformed NOAA request inputs",
+    )
+    assert_true(
+        "test_fetch_normalizes_valid_text_and_datatype_tuple" in tests,
+        "runtime tests must cover valid NOAA request normalization",
+    )
 
 
 def test_noaa_metric_units_are_explicit_and_converted():
@@ -326,6 +359,7 @@ def test_completed_plans_are_in_docs_plans():
     assert_completed_plan(DEPENDENCY_PLAN_PATH, "weather notebook dependency reproducibility")
     assert_completed_plan(PAGINATION_PLAN_PATH, "NOAA pagination")
     assert_completed_plan(METRIC_UNITS_PLAN_PATH, "NOAA metric units")
+    assert_completed_plan(REQUEST_INPUT_PLAN_PATH, "NOAA request input validation")
 
 
 def test_dependency_and_ci_contracts():
@@ -422,6 +456,7 @@ def main():
     tests = [
         test_noaa_token_comes_from_environment,
         test_noaa_requests_are_parameterized_and_bounded,
+        test_noaa_request_inputs_are_validated_before_network_use,
         test_noaa_metric_units_are_explicit_and_converted,
         test_noaa_requests_are_paginated_with_a_safety_bound,
         test_noaa_result_shape_is_checked,

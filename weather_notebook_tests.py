@@ -18,6 +18,49 @@ class FakeResponse:
 
 
 class WeatherNotebookTest(unittest.TestCase):
+    def test_fetch_rejects_invalid_inputs_before_request(self):
+        calls = []
+
+        def fake_get(*args, **kwargs):
+            calls.append((args, kwargs))
+            raise AssertionError("invalid inputs must not reach the network")
+
+        invalid_inputs = [
+            (True, ["TAVG"], "token", "station"),
+            (99, ["TAVG"], "token", "station"),
+            (2019, [], "token", "station"),
+            (2019, ["SNOW"], "token", "station"),
+            (2019, ["TAVG", 1], "token", "station"),
+            (2019, ["TAVG"], "   ", "station"),
+            (2019, ["TAVG"], "token", "   "),
+        ]
+        for year, datatypes, token, station in invalid_inputs:
+            with self.assertRaises(ValueError):
+                weather_notebook.fetch_noaa_data(
+                    year, datatypes, token, station, requests_get=fake_get
+                )
+
+        self.assertEqual(calls, [])
+
+    def test_fetch_normalizes_valid_text_and_datatype_tuple(self):
+        calls = []
+
+        def fake_get(url, headers, params, timeout):
+            calls.append((headers, params.copy()))
+            return FakeResponse({"results": []})
+
+        weather_notebook.fetch_noaa_data(
+            2019,
+            ("TAVG", "PRCP"),
+            "  test-token  ",
+            "  test-station  ",
+            requests_get=fake_get,
+        )
+
+        self.assertEqual(calls[0][0], {"token": "test-token"})
+        self.assertEqual(calls[0][1]["stationid"], "test-station")
+        self.assertEqual(calls[0][1]["datatypeid"], ["TAVG", "PRCP"])
+
     def test_fetch_accumulates_pages_and_advances_offsets(self):
         calls = []
         pages = [

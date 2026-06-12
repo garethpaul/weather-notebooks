@@ -1,5 +1,11 @@
 # Changes
 
+## 2026-06-12
+
+- Validated and normalized NOAA helper years, datatypes, tokens, and station
+  identifiers before the first network request.
+- Added fail-fast unit and static contract coverage for malformed inputs.
+
 ## 2026-06-10
 
 - Added a GitHub Actions check workflow that runs the existing offline

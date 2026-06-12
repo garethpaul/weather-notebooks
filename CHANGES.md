@@ -1,7 +1,18 @@
 # Changes
 
+## 2026-06-12
+
+- Validated and normalized NOAA helper years, datatypes, tokens, and station
+  identifiers before the first network request.
+- Added fail-fast unit and static contract coverage for malformed inputs.
+
 ## 2026-06-10
 
+- Added a GitHub Actions check workflow that runs the existing offline
+  `make check` notebook contract baseline on pushes, pull requests, and manual
+  dispatches.
+- Added static checker coverage requiring the CI workflow and completed CI
+  baseline plan to remain checked in.
 - Requested scaled metric NOAA values explicitly and corrected Celsius and
   millimeter conversions, including the precipitation inches divisor.
 - Added bounded NOAA offset pagination so result sets larger than 1,000 rows
@@ -12,6 +23,14 @@
   releases after direct OSV checks returned no advisories.
 - Added pinned, read-only Python 3.12/3.14 CI that installs and imports the
   scientific stack before running offline notebook contracts.
+- Made the hosted workflow fail closed through an exact checked-in contract,
+  credential-free checkout, all-branch triggers, and external-directory checks.
+- Extracted NOAA request and conversion helpers into an importable module and
+  added executable fake-HTTP pagination, validation, and safety-bound tests.
+- Made the direct dependency contract compare the complete active requirements
+  list instead of accepting pinned names in comments or extra unpinned entries.
+- Added Python 3.12 and 3.14 hash-locked transitive dependency graphs and made
+  hosted installs use pip hash enforcement.
 
 ## 2026-06-09
 

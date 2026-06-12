@@ -26,8 +26,13 @@ Helpful reports include:
 
 - This repository appears to be a data science notebook project. The active security scope is the code and documentation on the default branch.
 - The repository scan did not identify production authentication, payment, or secret-management code. Treat the project as public sample code unless future changes add sensitive surfaces.
+- GitHub Actions runs the offline `make check` notebook contract baseline before
+  review.
 - Direct notebook dependencies are exactly pinned in `requirements.txt` and
-  installed in hosted CI before offline contracts run.
+  resolved into Python 3.12 and 3.14 hash-locked graphs before hosted offline
+  contracts run.
+- Hosted CI uses read-only permissions, immutable action pins, and
+  credential-free checkout.
 
 ## Data and Notebook Notes
 

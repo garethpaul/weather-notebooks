@@ -1,11 +1,15 @@
 #!/usr/bin/env python3
 """Static reproducibility and token-safety checks for Weather.ipynb."""
+import hashlib
 import json
+import re
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
 NOTEBOOK = ROOT / "Weather.ipynb"
+RUNTIME_MODULE = ROOT / "weather_notebook.py"
+RUNTIME_TESTS = ROOT / "weather_notebook_tests.py"
 REPRODUCIBILITY_PLAN_PATH = ROOT / "docs" / "plans" / "2026-06-08-weather-notebook-reproducibility.md"
 DATE_ALIGNMENT_PLAN_PATH = ROOT / "docs" / "plans" / "2026-06-08-weather-notebook-date-alignment.md"
 DATA_SHAPE_PLAN_PATH = ROOT / "docs" / "plans" / "2026-06-08-weather-notebook-result-shape.md"
@@ -26,6 +30,7 @@ OBSERVATION_KEYS_PLAN_PATH = (
 TOKEN_WHITESPACE_PLAN_PATH = (
     ROOT / "docs" / "plans" / "2026-06-09-weather-notebook-token-whitespace.md"
 )
+CI_PLAN_PATH = ROOT / "docs" / "plans" / "2026-06-10-ci-baseline.md"
 DEPENDENCY_PLAN_PATH = (
     ROOT / "docs" / "plans" / "2026-06-10-dependency-reproducibility.md"
 )
@@ -35,7 +40,61 @@ PAGINATION_PLAN_PATH = (
 METRIC_UNITS_PLAN_PATH = (
     ROOT / "docs" / "plans" / "2026-06-10-noaa-metric-units.md"
 )
+REQUEST_INPUT_PLAN_PATH = (
+    ROOT / "docs" / "plans" / "2026-06-12-noaa-request-input-validation.md"
+)
 CI_WORKFLOW_PATH = ROOT / ".github" / "workflows" / "check.yml"
+LOCKFILE_SHA256 = {
+    "requirements-py312.lock": "47835a6609db0175be86dd3054e5e2334668b35cf0d0d59e45208ef2fc716179",
+    "requirements-py314.lock": "e82f04e40657676dfd0bb057f9158935acb594c053366e91d2f427a5db066b12",
+}
+
+EXPECTED_WORKFLOW = """name: Check
+
+on:
+  pull_request:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: check-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Python ${{ matrix.python-version }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - python-version: \"3.12\"
+            lockfile: requirements-py312.lock
+          - python-version: \"3.14\"
+            lockfile: requirements-py314.lock
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+      - name: Install dependencies
+        run: python -m pip install --require-hashes -r \"${{ matrix.lockfile }}\"
+      - name: Verify scientific stack imports
+        run: python -c \"import jupyter, matplotlib, numpy, pandas, requests\"
+      - name: Run repository checks
+        run: make check
+      - name: Verify external working directory
+        run: cd \"$(mktemp -d)\" && make -f \"$GITHUB_WORKSPACE/Makefile\" check
+"""
 
 
 def load_notebook():
@@ -47,6 +106,10 @@ def notebook_source(notebook):
         "".join(cell.get("source", []))
         for cell in notebook.get("cells", [])
     )
+
+
+def project_source():
+    return notebook_source(load_notebook()) + "\n" + RUNTIME_MODULE.read_text()
 
 
 def assert_true(condition, label):
@@ -67,26 +130,63 @@ def test_noaa_token_comes_from_environment():
 
 
 def test_noaa_requests_are_parameterized_and_bounded():
-    source = notebook_source(load_notebook())
+    source = project_source()
     assert_true("params=" in source, "NOAA requests must use structured query parameters")
     assert_true("timeout=REQUEST_TIMEOUT_SECONDS" in source, "NOAA requests must set a timeout")
     assert_true(".raise_for_status()" in source, "NOAA responses must fail fast on HTTP errors")
 
 
+def test_noaa_request_inputs_are_validated_before_network_use():
+    source = RUNTIME_MODULE.read_text()
+    function = source.split("def fetch_noaa_data", 1)[1].split("def record_observation", 1)[0]
+    request_index = function.index("response = requests_get(")
+    for contract in (
+        "isinstance(year, bool)",
+        "not isinstance(year, int)",
+        "year < 1000 or year > 9999",
+        "not isinstance(datatype_ids, (list, tuple)) or not datatype_ids",
+        "datatype not in SUPPORTED_DATATYPES",
+        "not isinstance(token, str) or not token.strip()",
+        "not isinstance(station_id, str) or not station_id.strip()",
+        "datatype_ids = list(datatype_ids)",
+        "token = token.strip()",
+        "station_id = station_id.strip()",
+    ):
+        assert_true(contract in function, "NOAA request validation must include {0!r}".format(contract))
+        assert_true(function.index(contract) < request_index, "NOAA request validation must run before network use")
+
+    tests = RUNTIME_TESTS.read_text()
+    assert_true(
+        "test_fetch_rejects_invalid_inputs_before_request" in tests,
+        "runtime tests must reject malformed NOAA request inputs",
+    )
+    assert_true(
+        "test_fetch_normalizes_valid_text_and_datatype_tuple" in tests,
+        "runtime tests must cover valid NOAA request normalization",
+    )
+
+
 def test_noaa_metric_units_are_explicit_and_converted():
-    source = notebook_source(load_notebook())
+    notebook = load_notebook()
+    markdown = "\n".join(
+        "".join(cell.get("source", []))
+        for cell in notebook.get("cells", [])
+        if cell.get("cell_type") == "markdown"
+    )
+    source = notebook_source(notebook) + "\n" + RUNTIME_MODULE.read_text()
     assert_true('"units": "metric"' in source, "NOAA requests must explicitly request scaled metric values")
     assert_true("def c_to_f(value):" in source, "temperature conversion must accept metric Celsius values")
     assert_true("return number * 1.8 + 32" in source, "Celsius values must convert to Fahrenheit without raw-data scaling")
     assert_true("return number / 25.4" in source, "millimeters must convert to inches with the exact divisor")
     assert_true("tenths_c_to_f" not in source, "metric NOAA values must not use raw tenths-Celsius conversion")
     assert_true("number / 25.54" not in source, "precipitation conversion must not use an incorrect divisor")
+    assert_true("tenths of Celsius" not in markdown, "notebook guidance must describe scaled metric Celsius values")
     for measurement in ("avg_temp", "min_temp", "max_temp"):
         assert_true("{0} = c_to_f(".format(measurement) in source, "{0} must use metric temperature conversion".format(measurement))
 
 
 def test_noaa_requests_are_paginated_with_a_safety_bound():
-    source = notebook_source(load_notebook())
+    source = project_source()
     for contract in (
             "NOAA_PAGE_LIMIT = 1000",
             "MAX_NOAA_PAGES = 20",
@@ -99,13 +199,13 @@ def test_noaa_requests_are_paginated_with_a_safety_bound():
         assert_true(contract in source, "missing NOAA pagination contract {0}".format(contract))
     assert_true(
         source.index('"offset": page_index * NOAA_PAGE_LIMIT + 1')
-        < source.index("response = requests.get("),
+        < source.index("response = requests_get("),
         "NOAA offset must be included before each request",
     )
 
 
 def test_noaa_result_shape_is_checked():
-    source = notebook_source(load_notebook())
+    source = project_source()
     assert_true("payload = response.json()" in source, "NOAA response JSON must be captured before reading results")
     assert_true("isinstance(payload, dict)" in source, "NOAA response root must be checked before dictionary access")
     assert_true(
@@ -128,9 +228,9 @@ def test_notebook_has_no_stale_outputs():
 
 
 def test_notebook_aligns_observations_by_date():
-    source = notebook_source(load_notebook())
+    source = project_source()
     assert_true("weather_by_date = {}" in source, "notebook must collect NOAA observations by date")
-    assert_true("def record_observation(item):" in source, "notebook must centralize observation recording")
+    assert_true("def record_observation(item, weather_by_date):" in source, "notebook must centralize observation recording")
     assert_true(".setdefault(date, {})" in source, "notebook must merge datatype values into a date bucket")
     assert_true(
         'pd.DataFrame(rows, columns=["date", "avgTemp", "minTemp", "maxTemp", "prcp"])' in source,
@@ -141,7 +241,7 @@ def test_notebook_aligns_observations_by_date():
 
 
 def test_notebook_rejects_non_text_observation_keys():
-    source = notebook_source(load_notebook())
+    source = project_source()
     assert_true(
         "if not isinstance(date, str) or not isinstance(datatype, str):" in source,
         "NOAA observation date and datatype keys must be textual before bucketing",
@@ -155,7 +255,7 @@ def test_notebook_rejects_non_text_observation_keys():
 
 
 def test_notebook_guards_observation_dates_and_values():
-    source = notebook_source(load_notebook())
+    source = project_source()
     assert_true("def parse_noaa_date(value):" in source, "notebook must parse NOAA dates through a guard helper")
     assert_true(
         'return datetime.strptime(value, "%Y-%m-%dT%H:%M:%S")' in source,
@@ -255,51 +355,108 @@ def test_completed_plans_are_in_docs_plans():
     assert_completed_plan(MEASUREMENT_ROWS_PLAN_PATH, "weather notebook measurement rows")
     assert_completed_plan(OBSERVATION_KEYS_PLAN_PATH, "weather notebook observation keys")
     assert_completed_plan(TOKEN_WHITESPACE_PLAN_PATH, "weather notebook token whitespace")
+    assert_completed_plan(CI_PLAN_PATH, "weather notebook CI baseline")
     assert_completed_plan(DEPENDENCY_PLAN_PATH, "weather notebook dependency reproducibility")
     assert_completed_plan(PAGINATION_PLAN_PATH, "NOAA pagination")
     assert_completed_plan(METRIC_UNITS_PLAN_PATH, "NOAA metric units")
+    assert_completed_plan(REQUEST_INPUT_PLAN_PATH, "NOAA request input validation")
 
 
 def test_dependency_and_ci_contracts():
-    requirements = (ROOT / "requirements.txt").read_text()
-    for requirement in (
-            "jupyter==1.1.1",
-            "matplotlib==3.10.9",
-            "numpy==2.4.6",
-            "pandas==3.0.3",
-            "requests==2.34.2"):
-        assert_true(requirement in requirements, "missing exact dependency pin {0}".format(requirement))
-    assert_true(">=" not in requirements, "direct notebook dependencies must be exact pins")
+    expected_requirements = [
+        "jupyter==1.1.1",
+        "matplotlib==3.10.9",
+        "numpy==2.4.6",
+        "pandas==3.0.3",
+        "requests==2.34.2",
+    ]
+    requirements = [
+        line.strip()
+        for line in (ROOT / "requirements.txt").read_text().splitlines()
+        if line.strip() and not line.lstrip().startswith("#")
+    ]
+    assert_true(requirements == expected_requirements, "requirements must match the exact direct dependency pins")
+    expected_direct = {
+        re.sub(r"[-_.]+", "-", name).lower(): version
+        for name, version in (requirement.split("==", 1) for requirement in expected_requirements)
+    }
+
+    for lock_name in ("requirements-py312.lock", "requirements-py314.lock"):
+        lock_path = ROOT / lock_name
+        assert_true(lock_path.is_file(), "{0} must be checked in".format(lock_name))
+        lock_bytes = lock_path.read_bytes()
+        assert_true(
+            hashlib.sha256(lock_bytes).hexdigest() == LOCKFILE_SHA256[lock_name],
+            "{0} must match the reviewed lock digest".format(lock_name),
+        )
+        lock_text = lock_bytes.decode("utf-8")
+        assert_true("#    make lock" in lock_text, "{0} must document reproducible generation".format(lock_name))
+        lock_lines = lock_text.splitlines()
+        active_indexes = [
+            index
+            for index, line in enumerate(lock_lines)
+            if line and not line.startswith((" ", "#"))
+        ]
+        assert_true(active_indexes, "{0} must contain locked packages".format(lock_name))
+        locked_packages = {}
+        for position, index in enumerate(active_indexes):
+            line = lock_lines[index]
+            end = active_indexes[position + 1] if position + 1 < len(active_indexes) else len(lock_lines)
+            block = lock_lines[index:end]
+            assert_true(
+                "==" in line and line.endswith(" \\") and any("--hash=sha256:" in item for item in block),
+                "{0} package entries must be exact pins with hashes".format(lock_name),
+            )
+            name, version = line[:-2].split("==", 1)
+            normalized_name = re.sub(r"[-_.]+", "-", name).lower()
+            assert_true(normalized_name not in locked_packages, "{0} must not duplicate packages".format(lock_name))
+            locked_packages[normalized_name] = version
+        for name, version in expected_direct.items():
+            assert_true(
+                locked_packages.get(name) == version,
+                "{0} must contain active direct pin {1}=={2}".format(lock_name, name, version),
+            )
 
     workflow = CI_WORKFLOW_PATH.read_text()
-    for contract in (
-            "permissions:\n  contents: read",
-            "concurrency:",
-            "cancel-in-progress: true",
-            "runs-on: ubuntu-24.04",
-            "timeout-minutes: 15",
-            'python-version: ["3.12", "3.14"]',
-            "actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10",
-            "actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405",
-            "python -m pip install -r requirements.txt",
-            "import jupyter, matplotlib, numpy, pandas, requests",
-            "run: make check"):
-        assert_true(contract in workflow, "missing CI contract {0}".format(contract))
-    assert_true("@v" not in workflow, "CI actions must use immutable commits")
-    assert_true("ubuntu-latest" not in workflow, "CI must not use a floating Ubuntu runner")
-    assert_true("# v6.0.3" in workflow, "checkout pin annotation must identify the exact release")
-    assert_true("# v6.2.0" in workflow, "setup-python pin annotation must identify the exact release")
+    assert_true(workflow == EXPECTED_WORKFLOW, "CI workflow must match the fail-closed baseline")
+    workflow_files = sorted((ROOT / ".github" / "workflows").glob("*.y*ml"))
+    assert_true(workflow_files == [CI_WORKFLOW_PATH], "check.yml must be the only workflow")
 
     makefile = (ROOT / "Makefile").read_text()
-    assert_true("ROOT := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))" in makefile, "Makefile must resolve the repository root")
+    assert_true(
+        "ROOT := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))" in makefile,
+        "Makefile must resolve the repository from its own path",
+    )
     assert_true("$(ROOT)/scripts/check_weather_notebook_contracts.py" in makefile, "Makefile must use the rooted contract path")
     assert_true('find "$(ROOT)"' in makefile, "Makefile cleanup must stay inside the repository")
+    assert_true('$(MAKE) -C "$(ROOT)" clean' in makefile, "recursive cleanup must stay rooted")
+    assert_true("$(PYTHON) -m unittest weather_notebook_tests" in makefile, "Makefile must run executable NOAA helper tests")
+    lock_command_template = (
+        'cd "$(ROOT)" && uv pip compile requirements.txt --python-version {python_version} '
+        '--python-platform x86_64-manylinux_2_28 --default-index https://pypi.org/simple '
+        "--generate-hashes --custom-compile-command 'make lock' --output-file {lockfile}"
+    )
+    for python_version, lockfile in (("3.12", "requirements-py312.lock"), ("3.14", "requirements-py314.lock")):
+        assert_true(
+            lock_command_template.format(python_version=python_version, lockfile=lockfile) in makefile,
+            "Makefile must preserve the reviewed {0} lock command".format(python_version),
+        )
+    assert_true(makefile.count("uv pip compile requirements.txt") == 2, "Makefile must define exactly two lock commands")
+    assert_true(RUNTIME_MODULE.is_file(), "NOAA runtime helpers must be importable")
+    assert_true(RUNTIME_TESTS.is_file(), "NOAA runtime helper tests must be checked in")
+
+    for docs_file in ("README.md", "VISION.md", "SECURITY.md", "CHANGES.md"):
+        assert_true(
+            "GitHub Actions" in (ROOT / docs_file).read_text(),
+            "{0} must document the GitHub Actions baseline".format(docs_file),
+        )
 
 
 def main():
     tests = [
         test_noaa_token_comes_from_environment,
         test_noaa_requests_are_parameterized_and_bounded,
+        test_noaa_request_inputs_are_validated_before_network_use,
         test_noaa_metric_units_are_explicit_and_converted,
         test_noaa_requests_are_paginated_with_a_safety_bound,
         test_noaa_result_shape_is_checked,

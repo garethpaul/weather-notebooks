@@ -27,6 +27,7 @@ Priority:
 - Reject NaN and infinite NOAA numeric values before plotting
 - Reject empty parsed observation sets before plotting
 - Skip date-valid rows that have no usable converted measurements
+- Keep GitHub Actions running the offline `make check` baseline before review
 - Avoid presenting historical data as current conditions
 - Keep the scientific environment exactly pinned and import-verified in CI
 
@@ -42,6 +43,8 @@ Contribution rules:
 - One PR = one focused data source, notebook, visualization, dependency, or documentation change.
 - Do not commit API tokens or private datasets.
 - Keep dataset refreshes sourced and dated.
+- Keep `.github/workflows/check.yml` aligned with the offline notebook contract
+  baseline.
 - Preserve unit conversion notes.
 
 ## Security And Responsible Use

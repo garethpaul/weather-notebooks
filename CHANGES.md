@@ -7,6 +7,22 @@
   dispatches.
 - Added static checker coverage requiring the CI workflow and completed CI
   baseline plan to remain checked in.
+- Requested scaled metric NOAA values explicitly and corrected Celsius and
+  millimeter conversions, including the precipitation inches divisor.
+- Added bounded NOAA offset pagination so result sets larger than 1,000 rows
+  are complete and a 20-page safety-limit exhaustion fails explicitly.
+- Made Make execution root-independent and fixed hosted checks to Ubuntu 24.04
+  with exact action release annotations.
+- Pinned the current stable Jupyter, Matplotlib, NumPy, pandas, and Requests
+  releases after direct OSV checks returned no advisories.
+- Added pinned, read-only Python 3.12/3.14 CI that installs and imports the
+  scientific stack before running offline notebook contracts.
+- Made the hosted workflow fail closed through an exact checked-in contract,
+  credential-free checkout, all-branch triggers, and external-directory checks.
+- Extracted NOAA request and conversion helpers into an importable module and
+  added executable fake-HTTP pagination, validation, and safety-bound tests.
+- Made the direct dependency contract compare the complete active requirements
+  list instead of accepting pinned names in comments or extra unpinned entries.
 
 ## 2026-06-09
 

@@ -18,7 +18,9 @@ Priority:
 - Keep NOAA tokens as local user-provided values
 - Reject blank or whitespace-only NOAA token values before requests
 - Make station ID, date range, and unit conversions visible
+- Request explicit NOAA metric scaling before display-unit conversion
 - Validate NOAA result shapes before converting observations
+- Fetch complete NOAA result pages within an explicit request safety bound
 - Raise explicit errors for unexpected NOAA response roots
 - Reject non-text NOAA observation date and datatype keys before bucketing
 - Guard malformed NOAA dates and numeric values before building rows
@@ -27,6 +29,7 @@ Priority:
 - Skip date-valid rows that have no usable converted measurements
 - Keep GitHub Actions running the offline `make check` baseline before review
 - Avoid presenting historical data as current conditions
+- Keep the scientific environment exactly pinned and import-verified in CI
 
 Next priorities:
 

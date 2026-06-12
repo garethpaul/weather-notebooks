@@ -26,9 +26,12 @@ Helpful reports include:
 
 - This repository appears to be a data science notebook project. The active security scope is the code and documentation on the default branch.
 - The repository scan did not identify production authentication, payment, or secret-management code. Treat the project as public sample code unless future changes add sensitive surfaces.
-- No primary dependency manifest was detected in the repository root. If dependencies are added later, include a manifest and prefer reproducible installation instructions.
 - GitHub Actions runs the offline `make check` notebook contract baseline before
   review.
+- Direct notebook dependencies are exactly pinned in `requirements.txt` and
+  installed in hosted CI before offline contracts run.
+- Hosted CI uses read-only permissions, immutable action pins, and
+  credential-free checkout.
 
 ## Data and Notebook Notes
 
@@ -37,6 +40,8 @@ For notebooks or data-processing workflows, report unsafe parsing, path traversa
 NOAA observation rows should reject malformed or non-text date and datatype
 keys before bucketing or conversion. Reports involving malformed API payloads
 should include a minimal synthetic response rather than live private data.
+NOAA result pagination is capped at 20,000 rows per request group so an
+unexpected upstream response cannot cause unbounded API calls or accumulation.
 
 ## Dependency and Supply Chain Security
 

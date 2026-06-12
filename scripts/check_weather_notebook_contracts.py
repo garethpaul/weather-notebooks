@@ -6,6 +6,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 NOTEBOOK = ROOT / "Weather.ipynb"
+RUNTIME_MODULE = ROOT / "weather_notebook.py"
+RUNTIME_TESTS = ROOT / "weather_notebook_tests.py"
 REPRODUCIBILITY_PLAN_PATH = ROOT / "docs" / "plans" / "2026-06-08-weather-notebook-reproducibility.md"
 DATE_ALIGNMENT_PLAN_PATH = ROOT / "docs" / "plans" / "2026-06-08-weather-notebook-date-alignment.md"
 DATA_SHAPE_PLAN_PATH = ROOT / "docs" / "plans" / "2026-06-08-weather-notebook-result-shape.md"
@@ -27,7 +29,59 @@ TOKEN_WHITESPACE_PLAN_PATH = (
     ROOT / "docs" / "plans" / "2026-06-09-weather-notebook-token-whitespace.md"
 )
 CI_PLAN_PATH = ROOT / "docs" / "plans" / "2026-06-10-ci-baseline.md"
+DEPENDENCY_PLAN_PATH = (
+    ROOT / "docs" / "plans" / "2026-06-10-dependency-reproducibility.md"
+)
+PAGINATION_PLAN_PATH = (
+    ROOT / "docs" / "plans" / "2026-06-10-noaa-pagination.md"
+)
+METRIC_UNITS_PLAN_PATH = (
+    ROOT / "docs" / "plans" / "2026-06-10-noaa-metric-units.md"
+)
 CI_WORKFLOW_PATH = ROOT / ".github" / "workflows" / "check.yml"
+
+EXPECTED_WORKFLOW = """name: Check
+
+on:
+  pull_request:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: check-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Python ${{ matrix.python-version }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: [\"3.12\", \"3.14\"]
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Verify scientific stack imports
+        run: python -c \"import jupyter, matplotlib, numpy, pandas, requests\"
+      - name: Run repository checks
+        run: make check
+      - name: Verify external working directory
+        run: cd \"$(mktemp -d)\" && make -f \"$GITHUB_WORKSPACE/Makefile\" check
+"""
 
 
 def load_notebook():
@@ -39,6 +93,10 @@ def notebook_source(notebook):
         "".join(cell.get("source", []))
         for cell in notebook.get("cells", [])
     )
+
+
+def project_source():
+    return notebook_source(load_notebook()) + "\n" + RUNTIME_MODULE.read_text()
 
 
 def assert_true(condition, label):
@@ -59,14 +117,52 @@ def test_noaa_token_comes_from_environment():
 
 
 def test_noaa_requests_are_parameterized_and_bounded():
-    source = notebook_source(load_notebook())
+    source = project_source()
     assert_true("params=" in source, "NOAA requests must use structured query parameters")
     assert_true("timeout=REQUEST_TIMEOUT_SECONDS" in source, "NOAA requests must set a timeout")
     assert_true(".raise_for_status()" in source, "NOAA responses must fail fast on HTTP errors")
 
 
+def test_noaa_metric_units_are_explicit_and_converted():
+    notebook = load_notebook()
+    markdown = "\n".join(
+        "".join(cell.get("source", []))
+        for cell in notebook.get("cells", [])
+        if cell.get("cell_type") == "markdown"
+    )
+    source = notebook_source(notebook) + "\n" + RUNTIME_MODULE.read_text()
+    assert_true('"units": "metric"' in source, "NOAA requests must explicitly request scaled metric values")
+    assert_true("def c_to_f(value):" in source, "temperature conversion must accept metric Celsius values")
+    assert_true("return number * 1.8 + 32" in source, "Celsius values must convert to Fahrenheit without raw-data scaling")
+    assert_true("return number / 25.4" in source, "millimeters must convert to inches with the exact divisor")
+    assert_true("tenths_c_to_f" not in source, "metric NOAA values must not use raw tenths-Celsius conversion")
+    assert_true("number / 25.54" not in source, "precipitation conversion must not use an incorrect divisor")
+    assert_true("tenths of Celsius" not in markdown, "notebook guidance must describe scaled metric Celsius values")
+    for measurement in ("avg_temp", "min_temp", "max_temp"):
+        assert_true("{0} = c_to_f(".format(measurement) in source, "{0} must use metric temperature conversion".format(measurement))
+
+
+def test_noaa_requests_are_paginated_with_a_safety_bound():
+    source = project_source()
+    for contract in (
+            "NOAA_PAGE_LIMIT = 1000",
+            "MAX_NOAA_PAGES = 20",
+            "for page_index in range(MAX_NOAA_PAGES):",
+            '"offset": page_index * NOAA_PAGE_LIMIT + 1',
+            "all_results.extend(results)",
+            "if len(results) < NOAA_PAGE_LIMIT:",
+            "return all_results",
+            'raise ValueError("NOAA response exceeded the page safety limit")'):
+        assert_true(contract in source, "missing NOAA pagination contract {0}".format(contract))
+    assert_true(
+        source.index('"offset": page_index * NOAA_PAGE_LIMIT + 1')
+        < source.index("response = requests_get("),
+        "NOAA offset must be included before each request",
+    )
+
+
 def test_noaa_result_shape_is_checked():
-    source = notebook_source(load_notebook())
+    source = project_source()
     assert_true("payload = response.json()" in source, "NOAA response JSON must be captured before reading results")
     assert_true("isinstance(payload, dict)" in source, "NOAA response root must be checked before dictionary access")
     assert_true(
@@ -89,9 +185,9 @@ def test_notebook_has_no_stale_outputs():
 
 
 def test_notebook_aligns_observations_by_date():
-    source = notebook_source(load_notebook())
+    source = project_source()
     assert_true("weather_by_date = {}" in source, "notebook must collect NOAA observations by date")
-    assert_true("def record_observation(item):" in source, "notebook must centralize observation recording")
+    assert_true("def record_observation(item, weather_by_date):" in source, "notebook must centralize observation recording")
     assert_true(".setdefault(date, {})" in source, "notebook must merge datatype values into a date bucket")
     assert_true(
         'pd.DataFrame(rows, columns=["date", "avgTemp", "minTemp", "maxTemp", "prcp"])' in source,
@@ -102,7 +198,7 @@ def test_notebook_aligns_observations_by_date():
 
 
 def test_notebook_rejects_non_text_observation_keys():
-    source = notebook_source(load_notebook())
+    source = project_source()
     assert_true(
         "if not isinstance(date, str) or not isinstance(datatype, str):" in source,
         "NOAA observation date and datatype keys must be textual before bucketing",
@@ -116,7 +212,7 @@ def test_notebook_rejects_non_text_observation_keys():
 
 
 def test_notebook_guards_observation_dates_and_values():
-    source = notebook_source(load_notebook())
+    source = project_source()
     assert_true("def parse_noaa_date(value):" in source, "notebook must parse NOAA dates through a guard helper")
     assert_true(
         'return datetime.strptime(value, "%Y-%m-%dT%H:%M:%S")' in source,
@@ -136,8 +232,8 @@ def test_notebook_guards_observation_dates_and_values():
         "if not math.isfinite(number):" in source,
         "NOAA numeric parsing must reject NaN and infinite values",
     )
-    assert_true("return number / 10.0 * 1.8 + 32" in source, "temperature conversion must use guarded numeric values")
-    assert_true("return number / 25.54" in source, "precipitation conversion must use guarded numeric values")
+    assert_true("return number * 1.8 + 32" in source, "temperature conversion must use guarded numeric values")
+    assert_true("return number / 25.4" in source, "precipitation conversion must use guarded numeric values")
 
 
 def test_notebook_rejects_empty_valid_observation_rows():
@@ -162,15 +258,15 @@ def test_notebook_rejects_empty_valid_observation_rows():
 def test_notebook_skips_rows_without_measurements():
     source = notebook_source(load_notebook())
     assert_true(
-        'avg_temp = tenths_c_to_f(values.get("TAVG"))' in source,
+        'avg_temp = c_to_f(values.get("TAVG"))' in source,
         "row building must store converted average temperature before append",
     )
     assert_true(
-        'min_temp = tenths_c_to_f(values.get("TMIN"))' in source,
+        'min_temp = c_to_f(values.get("TMIN"))' in source,
         "row building must store converted minimum temperature before append",
     )
     assert_true(
-        'max_temp = tenths_c_to_f(values.get("TMAX"))' in source,
+        'max_temp = c_to_f(values.get("TMAX"))' in source,
         "row building must store converted maximum temperature before append",
     )
     assert_true(
@@ -217,13 +313,43 @@ def test_completed_plans_are_in_docs_plans():
     assert_completed_plan(OBSERVATION_KEYS_PLAN_PATH, "weather notebook observation keys")
     assert_completed_plan(TOKEN_WHITESPACE_PLAN_PATH, "weather notebook token whitespace")
     assert_completed_plan(CI_PLAN_PATH, "weather notebook CI baseline")
+    assert_completed_plan(DEPENDENCY_PLAN_PATH, "weather notebook dependency reproducibility")
+    assert_completed_plan(PAGINATION_PLAN_PATH, "NOAA pagination")
+    assert_completed_plan(METRIC_UNITS_PLAN_PATH, "NOAA metric units")
 
 
-def test_ci_baseline_is_documented():
+def test_dependency_and_ci_contracts():
+    expected_requirements = [
+        "jupyter==1.1.1",
+        "matplotlib==3.10.9",
+        "numpy==2.4.6",
+        "pandas==3.0.3",
+        "requests==2.34.2",
+    ]
+    requirements = [
+        line.strip()
+        for line in (ROOT / "requirements.txt").read_text().splitlines()
+        if line.strip() and not line.lstrip().startswith("#")
+    ]
+    assert_true(requirements == expected_requirements, "requirements must match the exact direct dependency pins")
+
     workflow = CI_WORKFLOW_PATH.read_text()
-    assert_true("uses: actions/checkout@v4" in workflow, "CI workflow must check out the repository")
-    assert_true("uses: actions/setup-python@v5" in workflow, "CI workflow must set up Python")
-    assert_true("run: make check" in workflow, "CI workflow must run make check")
+    assert_true(workflow == EXPECTED_WORKFLOW, "CI workflow must match the fail-closed baseline")
+    workflow_files = sorted((ROOT / ".github" / "workflows").glob("*.y*ml"))
+    assert_true(workflow_files == [CI_WORKFLOW_PATH], "check.yml must be the only workflow")
+
+    makefile = (ROOT / "Makefile").read_text()
+    assert_true(
+        "ROOT := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))" in makefile,
+        "Makefile must resolve the repository from its own path",
+    )
+    assert_true("$(ROOT)/scripts/check_weather_notebook_contracts.py" in makefile, "Makefile must use the rooted contract path")
+    assert_true('find "$(ROOT)"' in makefile, "Makefile cleanup must stay inside the repository")
+    assert_true('$(MAKE) -C "$(ROOT)" clean' in makefile, "recursive cleanup must stay rooted")
+    assert_true("$(PYTHON) -m unittest weather_notebook_tests" in makefile, "Makefile must run executable NOAA helper tests")
+    assert_true(RUNTIME_MODULE.is_file(), "NOAA runtime helpers must be importable")
+    assert_true(RUNTIME_TESTS.is_file(), "NOAA runtime helper tests must be checked in")
+
     for docs_file in ("README.md", "VISION.md", "SECURITY.md", "CHANGES.md"):
         assert_true(
             "GitHub Actions" in (ROOT / docs_file).read_text(),
@@ -235,6 +361,8 @@ def main():
     tests = [
         test_noaa_token_comes_from_environment,
         test_noaa_requests_are_parameterized_and_bounded,
+        test_noaa_metric_units_are_explicit_and_converted,
+        test_noaa_requests_are_paginated_with_a_safety_bound,
         test_noaa_result_shape_is_checked,
         test_notebook_has_no_stale_outputs,
         test_notebook_aligns_observations_by_date,
@@ -243,7 +371,7 @@ def main():
         test_notebook_rejects_empty_valid_observation_rows,
         test_notebook_skips_rows_without_measurements,
         test_completed_plans_are_in_docs_plans,
-        test_ci_baseline_is_documented,
+        test_dependency_and_ci_contracts,
     ]
     for test in tests:
         test()

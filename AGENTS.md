@@ -10,6 +10,8 @@
 - `scripts` - baseline checks and helper scripts
 - `docs` - plans, notes, and generated README assets
 - `requirements.txt` - Python runtime dependencies
+- `weather_notebook.py` - importable NOAA request and conversion helpers
+- `weather_notebook_tests.py` - dependency-free helper behavior tests
 
 ## Development commands
 
@@ -28,7 +30,8 @@
 
 ## Testing guidance
 
-- No dedicated test files were detected; treat `make check` as the minimum baseline.
+- `weather_notebook_tests.py` covers pagination, payload validation, HTTP
+  failures, safety bounds, and unit conversion behavior.
 - Start with the narrowest relevant test or Make target, then run `make check` before handing off if the change is not documentation-only.
 - Keep README verification notes in sync when commands, fixtures, or supported toolchains change.
 

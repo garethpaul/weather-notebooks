@@ -23,6 +23,8 @@
   added executable fake-HTTP pagination, validation, and safety-bound tests.
 - Made the direct dependency contract compare the complete active requirements
   list instead of accepting pinned names in comments or extra unpinned entries.
+- Added Python 3.12 and 3.14 hash-locked transitive dependency graphs and made
+  hosted installs use pip hash enforcement.
 
 ## 2026-06-09
 

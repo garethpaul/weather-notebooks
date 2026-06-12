@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Static reproducibility and token-safety checks for Weather.ipynb."""
+import hashlib
 import json
+import re
 from pathlib import Path
 
 
@@ -39,6 +41,10 @@ METRIC_UNITS_PLAN_PATH = (
     ROOT / "docs" / "plans" / "2026-06-10-noaa-metric-units.md"
 )
 CI_WORKFLOW_PATH = ROOT / ".github" / "workflows" / "check.yml"
+LOCKFILE_SHA256 = {
+    "requirements-py312.lock": "47835a6609db0175be86dd3054e5e2334668b35cf0d0d59e45208ef2fc716179",
+    "requirements-py314.lock": "e82f04e40657676dfd0bb057f9158935acb594c053366e91d2f427a5db066b12",
+}
 
 EXPECTED_WORKFLOW = """name: Check
 
@@ -62,7 +68,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: [\"3.12\", \"3.14\"]
+        include:
+          - python-version: \"3.12\"
+            lockfile: requirements-py312.lock
+          - python-version: \"3.14\"
+            lockfile: requirements-py314.lock
     steps:
       - name: Check out repository
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
@@ -74,7 +84,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
           cache: pip
       - name: Install dependencies
-        run: python -m pip install -r requirements.txt
+        run: python -m pip install --require-hashes -r \"${{ matrix.lockfile }}\"
       - name: Verify scientific stack imports
         run: python -c \"import jupyter, matplotlib, numpy, pandas, requests\"
       - name: Run repository checks
@@ -332,6 +342,46 @@ def test_dependency_and_ci_contracts():
         if line.strip() and not line.lstrip().startswith("#")
     ]
     assert_true(requirements == expected_requirements, "requirements must match the exact direct dependency pins")
+    expected_direct = {
+        re.sub(r"[-_.]+", "-", name).lower(): version
+        for name, version in (requirement.split("==", 1) for requirement in expected_requirements)
+    }
+
+    for lock_name in ("requirements-py312.lock", "requirements-py314.lock"):
+        lock_path = ROOT / lock_name
+        assert_true(lock_path.is_file(), "{0} must be checked in".format(lock_name))
+        lock_bytes = lock_path.read_bytes()
+        assert_true(
+            hashlib.sha256(lock_bytes).hexdigest() == LOCKFILE_SHA256[lock_name],
+            "{0} must match the reviewed lock digest".format(lock_name),
+        )
+        lock_text = lock_bytes.decode("utf-8")
+        assert_true("#    make lock" in lock_text, "{0} must document reproducible generation".format(lock_name))
+        lock_lines = lock_text.splitlines()
+        active_indexes = [
+            index
+            for index, line in enumerate(lock_lines)
+            if line and not line.startswith((" ", "#"))
+        ]
+        assert_true(active_indexes, "{0} must contain locked packages".format(lock_name))
+        locked_packages = {}
+        for position, index in enumerate(active_indexes):
+            line = lock_lines[index]
+            end = active_indexes[position + 1] if position + 1 < len(active_indexes) else len(lock_lines)
+            block = lock_lines[index:end]
+            assert_true(
+                "==" in line and line.endswith(" \\") and any("--hash=sha256:" in item for item in block),
+                "{0} package entries must be exact pins with hashes".format(lock_name),
+            )
+            name, version = line[:-2].split("==", 1)
+            normalized_name = re.sub(r"[-_.]+", "-", name).lower()
+            assert_true(normalized_name not in locked_packages, "{0} must not duplicate packages".format(lock_name))
+            locked_packages[normalized_name] = version
+        for name, version in expected_direct.items():
+            assert_true(
+                locked_packages.get(name) == version,
+                "{0} must contain active direct pin {1}=={2}".format(lock_name, name, version),
+            )
 
     workflow = CI_WORKFLOW_PATH.read_text()
     assert_true(workflow == EXPECTED_WORKFLOW, "CI workflow must match the fail-closed baseline")
@@ -347,6 +397,17 @@ def test_dependency_and_ci_contracts():
     assert_true('find "$(ROOT)"' in makefile, "Makefile cleanup must stay inside the repository")
     assert_true('$(MAKE) -C "$(ROOT)" clean' in makefile, "recursive cleanup must stay rooted")
     assert_true("$(PYTHON) -m unittest weather_notebook_tests" in makefile, "Makefile must run executable NOAA helper tests")
+    lock_command_template = (
+        'cd "$(ROOT)" && uv pip compile requirements.txt --python-version {python_version} '
+        '--python-platform x86_64-manylinux_2_28 --default-index https://pypi.org/simple '
+        "--generate-hashes --custom-compile-command 'make lock' --output-file {lockfile}"
+    )
+    for python_version, lockfile in (("3.12", "requirements-py312.lock"), ("3.14", "requirements-py314.lock")):
+        assert_true(
+            lock_command_template.format(python_version=python_version, lockfile=lockfile) in makefile,
+            "Makefile must preserve the reviewed {0} lock command".format(python_version),
+        )
+    assert_true(makefile.count("uv pip compile requirements.txt") == 2, "Makefile must define exactly two lock commands")
     assert_true(RUNTIME_MODULE.is_file(), "NOAA runtime helpers must be importable")
     assert_true(RUNTIME_TESTS.is_file(), "NOAA runtime helper tests must be checked in")
 

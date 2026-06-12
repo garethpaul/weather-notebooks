@@ -34,7 +34,7 @@ Additional scan context:
 ```bash
 git clone https://github.com/garethpaul/weather-notebooks.git
 cd weather-notebooks
-python -m pip install -r requirements.txt
+python -m pip install --require-hashes -r requirements-py312.lock
 export NOAA_TOKEN=your-noaa-token
 ```
 
@@ -66,6 +66,10 @@ The setup commands above are derived from repository files. Legacy mobile, Pytho
 - `python3 scripts/check_weather_notebook_contracts.py` runs just the notebook contracts.
 - `python3 -m unittest weather_notebook_tests` runs the executable NOAA helper
   tests without a token or network request.
+- `make lock` regenerates reviewed Python 3.12 and 3.14 Linux lockfiles with
+  SHA-256 hashes from the five direct pins in `requirements.txt`.
+- Hosted installs use pip `--require-hashes` against the matrix-matched lock;
+  the current 106-package graph returned no findings from the official OSV API.
 - Completed maintenance plans live under `docs/plans` and are checked by
   `make check`.
 

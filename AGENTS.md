@@ -15,7 +15,7 @@
 
 ## Development commands
 
-- Install dependencies: `python3 -m pip install -r requirements.txt`
+- Install dependencies: `python3 -m pip install --require-hashes -r requirements-py312.lock`
 - Full baseline: `make check`
 - Combined verification: `make verify`
 - Lint/static checks: `make lint`

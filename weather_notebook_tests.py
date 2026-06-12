@@ -1,4 +1,5 @@
 import unittest
+from datetime import datetime
 
 import weather_notebook
 
@@ -37,8 +38,15 @@ class WeatherNotebookTest(unittest.TestCase):
         )
 
         self.assertEqual(len(results), weather_notebook.NOAA_PAGE_LIMIT + 1)
+        self.assertTrue(all(call[0] == weather_notebook.NOAA_API_URL for call in calls))
         self.assertEqual([call[2]["offset"] for call in calls], [1, 1001])
         self.assertTrue(all(call[2]["units"] == "metric" for call in calls))
+        self.assertTrue(all(call[2]["datasetid"] == "GHCND" for call in calls))
+        self.assertTrue(all(call[2]["datatypeid"] == ["TAVG", "TMAX"] for call in calls))
+        self.assertTrue(all(call[2]["limit"] == weather_notebook.NOAA_PAGE_LIMIT for call in calls))
+        self.assertTrue(all(call[2]["stationid"] == "test-station" for call in calls))
+        self.assertTrue(all(call[2]["startdate"] == "2019-01-01" for call in calls))
+        self.assertTrue(all(call[2]["enddate"] == "2019-12-31" for call in calls))
         self.assertTrue(all(call[1] == {"token": "test-token"} for call in calls))
         self.assertTrue(all(call[3] == weather_notebook.REQUEST_TIMEOUT_SECONDS for call in calls))
 
@@ -102,6 +110,49 @@ class WeatherNotebookTest(unittest.TestCase):
             with self.subTest(value=value):
                 self.assertIsNone(weather_notebook.c_to_f(value))
                 self.assertIsNone(weather_notebook.mm_to_inches(value))
+
+    def test_record_observation_merges_supported_values_by_date(self):
+        weather_by_date = {}
+
+        weather_notebook.record_observation(
+            {"date": "2019-01-01T00:00:00", "datatype": "TAVG", "value": 12.5},
+            weather_by_date,
+        )
+        weather_notebook.record_observation(
+            {"date": "2019-01-01T00:00:00", "datatype": "PRCP", "value": 2.0},
+            weather_by_date,
+        )
+
+        self.assertEqual(
+            weather_by_date,
+            {"2019-01-01T00:00:00": {"TAVG": 12.5, "PRCP": 2.0}},
+        )
+
+    def test_record_observation_ignores_invalid_keys_and_datatypes(self):
+        weather_by_date = {}
+        invalid_items = [
+            None,
+            [],
+            {"date": 20190101, "datatype": "TAVG", "value": 1},
+            {"date": "2019-01-01T00:00:00", "datatype": 1, "value": 1},
+            {"date": "", "datatype": "TAVG", "value": 1},
+            {"date": "2019-01-01T00:00:00", "datatype": "SNOW", "value": 1},
+        ]
+
+        for item in invalid_items:
+            with self.subTest(item=item):
+                weather_notebook.record_observation(item, weather_by_date)
+
+        self.assertEqual(weather_by_date, {})
+
+    def test_parse_noaa_date_accepts_expected_format_and_rejects_invalid_values(self):
+        self.assertEqual(
+            weather_notebook.parse_noaa_date("2019-01-02T00:00:00"),
+            datetime(2019, 1, 2),
+        )
+        for value in (None, 20190102, "2019-02-30T00:00:00", "2019-01-02"):
+            with self.subTest(value=value):
+                self.assertIsNone(weather_notebook.parse_noaa_date(value))
 
 
 if __name__ == "__main__":

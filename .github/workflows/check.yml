@@ -20,7 +20,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.12", "3.14"]
+        include:
+          - python-version: "3.12"
+            lockfile: requirements-py312.lock
+          - python-version: "3.14"
+            lockfile: requirements-py314.lock
     steps:
       - name: Check out repository
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
@@ -32,7 +36,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
           cache: pip
       - name: Install dependencies
-        run: python -m pip install -r requirements.txt
+        run: python -m pip install --require-hashes -r "${{ matrix.lockfile }}"
       - name: Verify scientific stack imports
         run: python -c "import jupyter, matplotlib, numpy, pandas, requests"
       - name: Run repository checks

@@ -49,6 +49,9 @@ METADATA_PAGINATION_PLAN_PATH = (
 RESPONSE_OFFSET_PLAN_PATH = (
     ROOT / "docs" / "plans" / "2026-06-13-noaa-response-offset-validation.md"
 )
+REDIRECT_BOUNDARY_PLAN_PATH = (
+    ROOT / "docs" / "plans" / "2026-06-13-noaa-token-redirect-boundary.md"
+)
 CI_WORKFLOW_PATH = ROOT / ".github" / "workflows" / "check.yml"
 LOCKFILE_SHA256 = {
     "requirements-py312.lock": "47835a6609db0175be86dd3054e5e2334668b35cf0d0d59e45208ef2fc716179",
@@ -139,7 +142,21 @@ def test_noaa_requests_are_parameterized_and_bounded():
     source = project_source()
     assert_true("params=" in source, "NOAA requests must use structured query parameters")
     assert_true("timeout=REQUEST_TIMEOUT_SECONDS" in source, "NOAA requests must set a timeout")
+    assert_true("allow_redirects=False" in source, "NOAA token requests must not follow redirects")
     assert_true(".raise_for_status()" in source, "NOAA responses must fail fast on HTTP errors")
+    request_function = RUNTIME_MODULE.read_text().split("def fetch_noaa_data", 1)[1].split(
+        "def noaa_resultset", 1
+    )[0]
+    assert_true(
+        request_function.index("response.raise_for_status()")
+        < request_function.index("payload = response.json()"),
+        "NOAA redirects and HTTP failures must be rejected before JSON parsing",
+    )
+    runtime_tests = RUNTIME_TESTS.read_text()
+    assert_true(
+        "test_fetch_rejects_redirect_before_parsing_json" in runtime_tests,
+        "runtime tests must cover redirect rejection before JSON parsing",
+    )
 
 
 def test_noaa_request_inputs_are_validated_before_network_use():
@@ -407,6 +424,7 @@ def test_completed_plans_are_in_docs_plans():
     assert_completed_plan(REQUEST_INPUT_PLAN_PATH, "NOAA request input validation")
     assert_completed_plan(METADATA_PAGINATION_PLAN_PATH, "NOAA metadata pagination")
     assert_completed_plan(RESPONSE_OFFSET_PLAN_PATH, "NOAA response offset validation")
+    assert_completed_plan(REDIRECT_BOUNDARY_PLAN_PATH, "NOAA token redirect boundary")
 
 
 def test_dependency_and_ci_contracts():

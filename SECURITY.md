@@ -45,6 +45,9 @@ NOAA result pagination is capped at 20,000 rows per request group so an
 unexpected upstream response cannot cause unbounded API calls or accumulation.
 When NOAA returns pagination metadata, its response offset must match the
 requested record before page results are accumulated.
+Token-bearing NOAA requests must not follow redirects; redirect responses are
+rejected before response bodies are parsed so the provider-specific `token`
+header stays on the configured API origin.
 
 ## Dependency and Supply Chain Security
 

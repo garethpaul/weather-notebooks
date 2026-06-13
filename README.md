@@ -46,6 +46,8 @@ The setup commands above are derived from repository files. Legacy mobile, Pytho
 - The notebook fetches NOAA CDO observations for station `GHCND:US1CAMR0037` across the configured date range.
 - NOAA requests explicitly use metric units; Celsius temperatures and
   millimeter precipitation are converted for Fahrenheit/inch presentation.
+- Token-bearing NOAA requests do not follow redirects, keeping credentials on
+  the configured Climate Data Online API origin.
 - NOAA result sets are fetched in 1,000-row pages with a 20-page safety limit
   per request group; exhausting the limit raises instead of silently truncating.
 
@@ -54,7 +56,8 @@ The setup commands above are derived from repository files. Legacy mobile, Pytho
 - `make verify` runs static notebook reproducibility, token-safety, date
   alignment, NOAA root/result-shape, observation key, finite numeric value,
   observation value-guard, token whitespace, metric-unit conversion,
-  pagination and response-offset validation, measurement-row, and empty-row
+  pagination, response-offset validation, redirect-boundary, measurement-row,
+  and empty-row
   checks. It also runs executable
   fake-HTTP tests for pagination, payload validation, failure propagation,
   request bounds, and unit conversions.
@@ -125,6 +128,8 @@ When the required SDK or runtime is unavailable, use static checks and source re
   NOAA pagination and record-based offset advancement.
 - See `docs/plans/2026-06-13-noaa-response-offset-validation.md` for validating
   optional response offsets before accumulating NOAA pages.
+- See `docs/plans/2026-06-13-noaa-token-redirect-boundary.md` for keeping the
+  NOAA token on the configured API origin.
 
 ## Contributing
 

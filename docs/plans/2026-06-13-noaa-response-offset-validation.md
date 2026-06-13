@@ -1,6 +1,6 @@
 # NOAA Response Offset Validation
 
-Status: In Progress
+Status: Completed
 
 ## Problem
 
@@ -28,11 +28,13 @@ https://www.ncdc.noaa.gov/cdo-web/webservices/v2
 
 ## Verification
 
-- Run focused response-offset unit tests.
-- Run the full `make check` gate locally and from an external working
-  directory.
-- Reject hostile mutations for ignored offsets, malformed offset acceptance,
-  late validation, compatibility regressions, and stale plan status.
-- Run Python compilation, `git diff --check`, artifact review, and focused
-  secret review.
-- Do not perform a live NOAA request or use a real token.
+- Three focused response-offset and pagination unit tests passed, along with
+  the focused dependency-free source contract.
+- The full `make check` gate passed locally and from an external working
+  directory with 16 unit tests and 16 offline contracts.
+- Six hostile mutations were rejected for ignored offsets, boolean and zero
+  offset acceptance, late validation, mandatory-offset compatibility
+  regression, and stale plan status.
+- Python compilation, `git diff --check`, artifact review, and focused secret
+  review passed.
+- No live NOAA request or real token was used.

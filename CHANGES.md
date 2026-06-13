@@ -1,5 +1,11 @@
 # Changes
 
+## 2026-06-13
+
+- Validated optional NOAA response offsets against each requested record before
+  accumulating page results.
+- Rejected malformed response offsets and added deterministic pagination tests.
+
 ## 2026-06-12
 
 - Validated and normalized NOAA helper years, datatypes, tokens, and station

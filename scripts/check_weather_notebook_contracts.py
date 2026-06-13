@@ -46,6 +46,9 @@ REQUEST_INPUT_PLAN_PATH = (
 METADATA_PAGINATION_PLAN_PATH = (
     ROOT / "docs" / "plans" / "2026-06-13-noaa-metadata-pagination.md"
 )
+RESPONSE_OFFSET_PLAN_PATH = (
+    ROOT / "docs" / "plans" / "2026-06-13-noaa-response-offset-validation.md"
+)
 CI_WORKFLOW_PATH = ROOT / ".github" / "workflows" / "check.yml"
 LOCKFILE_SHA256 = {
     "requirements-py312.lock": "47835a6609db0175be86dd3054e5e2334668b35cf0d0d59e45208ef2fc716179",
@@ -198,7 +201,7 @@ def test_noaa_requests_are_paginated_with_a_safety_bound():
             '"offset": next_offset',
             "all_results.extend(results)",
             "next_offset += len(results)",
-            "result_count = noaa_result_count(payload)",
+            "resultset = noaa_resultset(payload)",
             "if len(all_results) == result_count:",
             "elif len(results) < NOAA_PAGE_LIMIT:",
             "return all_results",
@@ -222,6 +225,28 @@ def test_noaa_pagination_metadata_is_validated():
         'raise ValueError("NOAA pagination made no progress")',
     ):
         assert_true(contract in source, "missing NOAA metadata contract {0}".format(contract))
+
+
+def test_noaa_response_offsets_are_validated_before_accumulation():
+    source = RUNTIME_MODULE.read_text()
+    for contract in (
+            'offset = resultset.get("offset")',
+            "isinstance(offset, bool)",
+            "not isinstance(offset, int)",
+            "offset < 1",
+            'raise ValueError("NOAA response offset must be a positive integer")',
+            "response_offset is not None and response_offset != next_offset",
+            'raise ValueError("NOAA response offset does not match request")'):
+        assert_true(contract in source, "missing NOAA response-offset contract {0}".format(contract))
+
+    mismatch_guard = source.index(
+        "if response_offset is not None and response_offset != next_offset:"
+    )
+    accumulation = source.index("all_results.extend(results)")
+    assert_true(
+        mismatch_guard < accumulation,
+        "NOAA response offsets must be validated before page accumulation",
+    )
 
 
 def test_noaa_result_shape_is_checked():
@@ -381,6 +406,7 @@ def test_completed_plans_are_in_docs_plans():
     assert_completed_plan(METRIC_UNITS_PLAN_PATH, "NOAA metric units")
     assert_completed_plan(REQUEST_INPUT_PLAN_PATH, "NOAA request input validation")
     assert_completed_plan(METADATA_PAGINATION_PLAN_PATH, "NOAA metadata pagination")
+    assert_completed_plan(RESPONSE_OFFSET_PLAN_PATH, "NOAA response offset validation")
 
 
 def test_dependency_and_ci_contracts():
@@ -481,6 +507,7 @@ def main():
         test_noaa_metric_units_are_explicit_and_converted,
         test_noaa_requests_are_paginated_with_a_safety_bound,
         test_noaa_pagination_metadata_is_validated,
+        test_noaa_response_offsets_are_validated_before_accumulation,
         test_noaa_result_shape_is_checked,
         test_notebook_has_no_stale_outputs,
         test_notebook_aligns_observations_by_date,

@@ -53,7 +53,10 @@ def fetch_noaa_data(year, datatype_ids, token, station_id, requests_get=None):
         results = payload.get("results", [])
         if not isinstance(results, list):
             raise ValueError("NOAA results must be a list")
-        result_count = noaa_result_count(payload)
+        resultset = noaa_resultset(payload)
+        result_count, response_offset = resultset or (None, None)
+        if response_offset is not None and response_offset != next_offset:
+            raise ValueError("NOAA response offset does not match request")
         all_results.extend(results)
         next_offset += len(results)
         if result_count is not None:
@@ -68,7 +71,7 @@ def fetch_noaa_data(year, datatype_ids, token, station_id, requests_get=None):
     raise ValueError("NOAA response exceeded the page safety limit")
 
 
-def noaa_result_count(payload):
+def noaa_resultset(payload):
     metadata = payload.get("metadata")
     if metadata is None:
         return None
@@ -80,7 +83,11 @@ def noaa_result_count(payload):
     count = resultset.get("count")
     if isinstance(count, bool) or not isinstance(count, int) or count < 0:
         raise ValueError("NOAA result count must be a nonnegative integer")
-    return count
+    offset = resultset.get("offset")
+    if offset is not None and (
+            isinstance(offset, bool) or not isinstance(offset, int) or offset < 1):
+        raise ValueError("NOAA response offset must be a positive integer")
+    return count, offset
 
 
 def record_observation(item, weather_by_date):

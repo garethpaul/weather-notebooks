@@ -21,6 +21,7 @@ Priority:
 - Request explicit NOAA metric scaling before display-unit conversion
 - Validate NOAA result shapes before converting observations
 - Fetch complete NOAA result pages within an explicit request safety bound
+- Validate returned NOAA page offsets before accumulating observations
 - Raise explicit errors for unexpected NOAA response roots
 - Reject non-text NOAA observation date and datatype keys before bucketing
 - Guard malformed NOAA dates and numeric values before building rows

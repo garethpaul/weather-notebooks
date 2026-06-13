@@ -133,7 +133,7 @@ class WeatherNotebookTest(unittest.TestCase):
             calls.append(params["offset"])
             return FakeResponse({
                 "results": pages[len(calls) - 1],
-                "metadata": {"resultset": {"count": 3}}
+                "metadata": {"resultset": {"count": 3, "offset": calls[-1]}}
             })
 
         results = weather_notebook.fetch_noaa_data(
@@ -142,6 +142,37 @@ class WeatherNotebookTest(unittest.TestCase):
 
         self.assertEqual(results, [{"id": 1}, {"id": 2}, {"id": 3}])
         self.assertEqual(calls, [1, 3])
+
+    def test_fetch_rejects_mismatched_response_offset_before_next_request(self):
+        calls = []
+
+        def fake_get(url, headers, params, timeout):
+            calls.append(params["offset"])
+            return FakeResponse({
+                "results": [{"id": "wrong-page"}],
+                "metadata": {"resultset": {"count": 2, "offset": 2}},
+            })
+
+        with self.assertRaisesRegex(ValueError, "offset does not match request"):
+            weather_notebook.fetch_noaa_data(
+                2019, ["TAVG"], "token", "station", requests_get=fake_get
+            )
+
+        self.assertEqual(calls, [1])
+
+    def test_fetch_rejects_malformed_response_offsets(self):
+        for offset in (True, 0, -1, 1.5, "1"):
+            with self.subTest(offset=offset):
+                def fake_get(url, headers, params, timeout):
+                    return FakeResponse({
+                        "results": [],
+                        "metadata": {"resultset": {"count": 0, "offset": offset}},
+                    })
+
+                with self.assertRaisesRegex(ValueError, "positive integer"):
+                    weather_notebook.fetch_noaa_data(
+                        2019, ["TAVG"], "token", "station", requests_get=fake_get
+                    )
 
     def test_fetch_rejects_malformed_or_stalled_metadata_pages(self):
         payloads = [

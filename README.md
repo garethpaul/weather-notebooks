@@ -54,7 +54,8 @@ The setup commands above are derived from repository files. Legacy mobile, Pytho
 - `make verify` runs static notebook reproducibility, token-safety, date
   alignment, NOAA root/result-shape, observation key, finite numeric value,
   observation value-guard, token whitespace, metric-unit conversion,
-  pagination, measurement-row, and empty-row checks. It also runs executable
+  pagination and response-offset validation, measurement-row, and empty-row
+  checks. It also runs executable
   fake-HTTP tests for pagination, payload validation, failure propagation,
   request bounds, and unit conversions.
 - `make check` runs `make verify` with bytecode cleanup before and after.
@@ -122,6 +123,8 @@ When the required SDK or runtime is unavailable, use static checks and source re
   validation and normalization at the reusable NOAA request boundary.
 - See `docs/plans/2026-06-13-noaa-metadata-pagination.md` for result-count-aware
   NOAA pagination and record-based offset advancement.
+- See `docs/plans/2026-06-13-noaa-response-offset-validation.md` for validating
+  optional response offsets before accumulating NOAA pages.
 
 ## Contributing
 

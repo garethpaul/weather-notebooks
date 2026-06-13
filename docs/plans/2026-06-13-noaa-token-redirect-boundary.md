@@ -6,7 +6,7 @@ date: 2026-06-13
 
 # NOAA Token Redirect Boundary
 
-## Status: Planned
+## Status: Completed
 
 ## Context
 
@@ -45,13 +45,18 @@ Primary references:
 
 ## Verification
 
-- Run focused redirect tests and hostile mutations under explicit timeouts.
-- Run local and external-working-directory `make check` under explicit
-  timeouts.
-- Validate notebook JSON/output state, Python syntax, workflow YAML, lockfile
-  integrity, intended paths, artifacts, conflict markers, whitespace, and
-  changed-line credential patterns.
-- Do not use a live NOAA token or network request.
+- Four focused runtime tests passed for redirect disabling, normalized request
+  options, HTTP failure propagation, and fail-before-JSON ordering.
+- All 17 executable helper tests passed.
+- Four hostile mutations covering option removal, redirect re-enablement,
+  reversed status/JSON ordering, and missing runtime coverage were rejected.
+- Final local and external-working-directory `make check` runs passed under
+  explicit three-minute timeouts with 17 executable tests and 16 offline
+  contracts.
+- Notebook JSON/output state, Python syntax, workflow YAML, lockfile integrity,
+  intended paths, artifacts, conflict markers, whitespace, and changed-line
+  credential patterns are included in the final audit.
+- No live NOAA token or network request was used.
 
 ## Scope Boundaries
 

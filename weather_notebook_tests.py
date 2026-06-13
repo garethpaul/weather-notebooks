@@ -8,12 +8,14 @@ class FakeResponse:
     def __init__(self, payload, error=None):
         self.payload = payload
         self.error = error
+        self.json_calls = 0
 
     def raise_for_status(self):
         if self.error is not None:
             raise self.error
 
     def json(self):
+        self.json_calls += 1
         return self.payload
 
 
@@ -45,8 +47,8 @@ class WeatherNotebookTest(unittest.TestCase):
     def test_fetch_normalizes_valid_text_and_datatype_tuple(self):
         calls = []
 
-        def fake_get(url, headers, params, timeout):
-            calls.append((headers, params.copy()))
+        def fake_get(url, headers, params, timeout, allow_redirects):
+            calls.append((headers, params.copy(), allow_redirects))
             return FakeResponse({"results": []})
 
         weather_notebook.fetch_noaa_data(
@@ -60,6 +62,7 @@ class WeatherNotebookTest(unittest.TestCase):
         self.assertEqual(calls[0][0], {"token": "test-token"})
         self.assertEqual(calls[0][1]["stationid"], "test-station")
         self.assertEqual(calls[0][1]["datatypeid"], ["TAVG", "PRCP"])
+        self.assertFalse(calls[0][2])
 
     def test_fetch_accumulates_pages_and_advances_offsets(self):
         calls = []
@@ -68,8 +71,8 @@ class WeatherNotebookTest(unittest.TestCase):
             [{"id": "last"}],
         ]
 
-        def fake_get(url, headers, params, timeout):
-            calls.append((url, headers, params.copy(), timeout))
+        def fake_get(url, headers, params, timeout, allow_redirects):
+            calls.append((url, headers, params.copy(), timeout, allow_redirects))
             return FakeResponse({"results": pages[len(calls) - 1]})
 
         results = weather_notebook.fetch_noaa_data(
@@ -92,11 +95,12 @@ class WeatherNotebookTest(unittest.TestCase):
         self.assertTrue(all(call[2]["enddate"] == "2019-12-31" for call in calls))
         self.assertTrue(all(call[1] == {"token": "test-token"} for call in calls))
         self.assertTrue(all(call[3] == weather_notebook.REQUEST_TIMEOUT_SECONDS for call in calls))
+        self.assertTrue(all(call[4] is False for call in calls))
 
     def test_fetch_stops_after_a_short_page(self):
         calls = []
 
-        def fake_get(url, headers, params, timeout):
+        def fake_get(url, headers, params, timeout, allow_redirects):
             calls.append(params.copy())
             return FakeResponse({"results": [{"id": 1}]})
 
@@ -111,7 +115,7 @@ class WeatherNotebookTest(unittest.TestCase):
         calls = []
         page = [{"id": index} for index in range(weather_notebook.NOAA_PAGE_LIMIT)]
 
-        def fake_get(url, headers, params, timeout):
+        def fake_get(url, headers, params, timeout, allow_redirects):
             calls.append(params["offset"])
             return FakeResponse({
                 "results": page,
@@ -129,7 +133,7 @@ class WeatherNotebookTest(unittest.TestCase):
         calls = []
         pages = [[{"id": 1}, {"id": 2}], [{"id": 3}]]
 
-        def fake_get(url, headers, params, timeout):
+        def fake_get(url, headers, params, timeout, allow_redirects):
             calls.append(params["offset"])
             return FakeResponse({
                 "results": pages[len(calls) - 1],
@@ -146,7 +150,7 @@ class WeatherNotebookTest(unittest.TestCase):
     def test_fetch_rejects_mismatched_response_offset_before_next_request(self):
         calls = []
 
-        def fake_get(url, headers, params, timeout):
+        def fake_get(url, headers, params, timeout, allow_redirects):
             calls.append(params["offset"])
             return FakeResponse({
                 "results": [{"id": "wrong-page"}],
@@ -163,7 +167,7 @@ class WeatherNotebookTest(unittest.TestCase):
     def test_fetch_rejects_malformed_response_offsets(self):
         for offset in (True, 0, -1, 1.5, "1"):
             with self.subTest(offset=offset):
-                def fake_get(url, headers, params, timeout):
+                def fake_get(url, headers, params, timeout, allow_redirects):
                     return FakeResponse({
                         "results": [],
                         "metadata": {"resultset": {"count": 0, "offset": offset}},
@@ -228,10 +232,27 @@ class WeatherNotebookTest(unittest.TestCase):
                 ),
             )
 
+    def test_fetch_rejects_redirect_before_parsing_json(self):
+        response = FakeResponse(
+            {"results": [{"must": "not be parsed"}]},
+            RuntimeError("redirect rejected"),
+        )
+
+        def fake_get(url, headers, params, timeout, allow_redirects):
+            self.assertFalse(allow_redirects)
+            return response
+
+        with self.assertRaisesRegex(RuntimeError, "redirect rejected"):
+            weather_notebook.fetch_noaa_data(
+                2019, ["PRCP"], "token", "station", requests_get=fake_get
+            )
+
+        self.assertEqual(response.json_calls, 0)
+
     def test_fetch_fails_at_page_safety_limit(self):
         calls = []
 
-        def fake_get(url, headers, params, timeout):
+        def fake_get(url, headers, params, timeout, allow_redirects):
             calls.append(params["offset"])
             return FakeResponse({"results": [None] * weather_notebook.NOAA_PAGE_LIMIT})
 

@@ -45,6 +45,7 @@ def fetch_noaa_data(year, datatype_ids, token, station_id, requests_get=None):
             headers={"token": token},
             params=params,
             timeout=REQUEST_TIMEOUT_SECONDS,
+            allow_redirects=False,
         )
         response.raise_for_status()
         payload = response.json()

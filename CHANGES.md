@@ -2,6 +2,10 @@
 
 ## 2026-06-13
 
+- Disabled redirects on token-bearing NOAA requests so provider credentials
+  cannot be forwarded to a different origin.
+- Added executable and static ordering coverage for redirect rejection before
+  response JSON parsing.
 - Validated optional NOAA response offsets against each requested record before
   accumulating page results.
 - Rejected malformed response offsets and added deterministic pagination tests.

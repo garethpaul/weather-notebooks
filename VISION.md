@@ -16,6 +16,7 @@ Priority:
 
 - Preserve the notebook analysis flow
 - Keep NOAA tokens as local user-provided values
+- Keep NOAA tokens on the configured API origin by rejecting redirects
 - Reject blank or whitespace-only NOAA token values before requests
 - Make station ID, date range, and unit conversions visible
 - Request explicit NOAA metric scaling before display-unit conversion

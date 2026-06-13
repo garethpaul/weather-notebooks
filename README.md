@@ -120,6 +120,8 @@ When the required SDK or runtime is unavailable, use static checks and source re
   scaling and corrected display conversions.
 - See `docs/plans/2026-06-12-noaa-request-input-validation.md` for fail-fast
   validation and normalization at the reusable NOAA request boundary.
+- See `docs/plans/2026-06-13-noaa-metadata-pagination.md` for result-count-aware
+  NOAA pagination and record-based offset advancement.
 
 ## Contributing
 

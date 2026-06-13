@@ -28,12 +28,13 @@ def fetch_noaa_data(year, datatype_ids, token, station_id, requests_get=None):
     token = token.strip()
     station_id = station_id.strip()
     all_results = []
-    for page_index in range(MAX_NOAA_PAGES):
+    next_offset = 1
+    for _page_index in range(MAX_NOAA_PAGES):
         params = {
             "datasetid": "GHCND",
             "datatypeid": datatype_ids,
             "limit": NOAA_PAGE_LIMIT,
-            "offset": page_index * NOAA_PAGE_LIMIT + 1,
+            "offset": next_offset,
             "stationid": station_id,
             "startdate": "{0}-01-01".format(year),
             "enddate": "{0}-12-31".format(year),
@@ -52,10 +53,34 @@ def fetch_noaa_data(year, datatype_ids, token, station_id, requests_get=None):
         results = payload.get("results", [])
         if not isinstance(results, list):
             raise ValueError("NOAA results must be a list")
+        result_count = noaa_result_count(payload)
         all_results.extend(results)
-        if len(results) < NOAA_PAGE_LIMIT:
+        next_offset += len(results)
+        if result_count is not None:
+            if len(all_results) > result_count:
+                raise ValueError("NOAA result count is inconsistent")
+            if len(all_results) == result_count:
+                return all_results
+            if not results:
+                raise ValueError("NOAA pagination made no progress")
+        elif len(results) < NOAA_PAGE_LIMIT:
             return all_results
     raise ValueError("NOAA response exceeded the page safety limit")
+
+
+def noaa_result_count(payload):
+    metadata = payload.get("metadata")
+    if metadata is None:
+        return None
+    if not isinstance(metadata, dict):
+        raise ValueError("NOAA metadata must be an object")
+    resultset = metadata.get("resultset")
+    if not isinstance(resultset, dict):
+        raise ValueError("NOAA resultset metadata must be an object")
+    count = resultset.get("count")
+    if isinstance(count, bool) or not isinstance(count, int) or count < 0:
+        raise ValueError("NOAA result count must be a nonnegative integer")
+    return count
 
 
 def record_observation(item, weather_by_date):

@@ -107,6 +107,72 @@ class WeatherNotebookTest(unittest.TestCase):
         self.assertEqual(results, [{"id": 1}])
         self.assertEqual(len(calls), 1)
 
+    def test_fetch_uses_metadata_count_for_exact_full_final_page(self):
+        calls = []
+        page = [{"id": index} for index in range(weather_notebook.NOAA_PAGE_LIMIT)]
+
+        def fake_get(url, headers, params, timeout):
+            calls.append(params["offset"])
+            return FakeResponse({
+                "results": page,
+                "metadata": {"resultset": {"count": len(page)}}
+            })
+
+        results = weather_notebook.fetch_noaa_data(
+            2019, ["TAVG"], "token", "station", requests_get=fake_get
+        )
+
+        self.assertEqual(results, page)
+        self.assertEqual(calls, [1])
+
+    def test_fetch_advances_metadata_pages_by_records_received(self):
+        calls = []
+        pages = [[{"id": 1}, {"id": 2}], [{"id": 3}]]
+
+        def fake_get(url, headers, params, timeout):
+            calls.append(params["offset"])
+            return FakeResponse({
+                "results": pages[len(calls) - 1],
+                "metadata": {"resultset": {"count": 3}}
+            })
+
+        results = weather_notebook.fetch_noaa_data(
+            2019, ["TAVG"], "token", "station", requests_get=fake_get
+        )
+
+        self.assertEqual(results, [{"id": 1}, {"id": 2}, {"id": 3}])
+        self.assertEqual(calls, [1, 3])
+
+    def test_fetch_rejects_malformed_or_stalled_metadata_pages(self):
+        payloads = [
+            ({"results": [], "metadata": []}, "metadata must be an object"),
+            (
+                {"results": [], "metadata": {"resultset": {"count": True}}},
+                "nonnegative integer",
+            ),
+            (
+                {"results": [], "metadata": {"resultset": {"count": 1}}},
+                "made no progress",
+            ),
+            (
+                {
+                    "results": [{"id": 1}, {"id": 2}],
+                    "metadata": {"resultset": {"count": 1}},
+                },
+                "count is inconsistent",
+            ),
+        ]
+        for payload, message in payloads:
+            with self.subTest(payload=payload):
+                with self.assertRaisesRegex(ValueError, message):
+                    weather_notebook.fetch_noaa_data(
+                        2019,
+                        ["PRCP"],
+                        "token",
+                        "station",
+                        requests_get=lambda *args, **kwargs: FakeResponse(payload),
+                    )
+
     def test_fetch_rejects_malformed_payloads(self):
         for payload, message in (([], "object"), ({"results": {}}, "list")):
             with self.subTest(payload=payload):

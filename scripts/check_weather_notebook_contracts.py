@@ -43,6 +43,9 @@ METRIC_UNITS_PLAN_PATH = (
 REQUEST_INPUT_PLAN_PATH = (
     ROOT / "docs" / "plans" / "2026-06-12-noaa-request-input-validation.md"
 )
+METADATA_PAGINATION_PLAN_PATH = (
+    ROOT / "docs" / "plans" / "2026-06-13-noaa-metadata-pagination.md"
+)
 CI_WORKFLOW_PATH = ROOT / ".github" / "workflows" / "check.yml"
 LOCKFILE_SHA256 = {
     "requirements-py312.lock": "47835a6609db0175be86dd3054e5e2334668b35cf0d0d59e45208ef2fc716179",
@@ -190,18 +193,35 @@ def test_noaa_requests_are_paginated_with_a_safety_bound():
     for contract in (
             "NOAA_PAGE_LIMIT = 1000",
             "MAX_NOAA_PAGES = 20",
-            "for page_index in range(MAX_NOAA_PAGES):",
-            '"offset": page_index * NOAA_PAGE_LIMIT + 1',
+            "next_offset = 1",
+            "for _page_index in range(MAX_NOAA_PAGES):",
+            '"offset": next_offset',
             "all_results.extend(results)",
-            "if len(results) < NOAA_PAGE_LIMIT:",
+            "next_offset += len(results)",
+            "result_count = noaa_result_count(payload)",
+            "if len(all_results) == result_count:",
+            "elif len(results) < NOAA_PAGE_LIMIT:",
             "return all_results",
             'raise ValueError("NOAA response exceeded the page safety limit")'):
         assert_true(contract in source, "missing NOAA pagination contract {0}".format(contract))
     assert_true(
-        source.index('"offset": page_index * NOAA_PAGE_LIMIT + 1')
+        source.index('"offset": next_offset')
         < source.index("response = requests_get("),
         "NOAA offset must be included before each request",
     )
+
+
+def test_noaa_pagination_metadata_is_validated():
+    source = RUNTIME_MODULE.read_text()
+    for contract in (
+        'metadata = payload.get("metadata")',
+        'raise ValueError("NOAA metadata must be an object")',
+        'raise ValueError("NOAA resultset metadata must be an object")',
+        "isinstance(count, bool)",
+        'raise ValueError("NOAA result count must be a nonnegative integer")',
+        'raise ValueError("NOAA pagination made no progress")',
+    ):
+        assert_true(contract in source, "missing NOAA metadata contract {0}".format(contract))
 
 
 def test_noaa_result_shape_is_checked():
@@ -360,6 +380,7 @@ def test_completed_plans_are_in_docs_plans():
     assert_completed_plan(PAGINATION_PLAN_PATH, "NOAA pagination")
     assert_completed_plan(METRIC_UNITS_PLAN_PATH, "NOAA metric units")
     assert_completed_plan(REQUEST_INPUT_PLAN_PATH, "NOAA request input validation")
+    assert_completed_plan(METADATA_PAGINATION_PLAN_PATH, "NOAA metadata pagination")
 
 
 def test_dependency_and_ci_contracts():
@@ -459,6 +480,7 @@ def main():
         test_noaa_request_inputs_are_validated_before_network_use,
         test_noaa_metric_units_are_explicit_and_converted,
         test_noaa_requests_are_paginated_with_a_safety_bound,
+        test_noaa_pagination_metadata_is_validated,
         test_noaa_result_shape_is_checked,
         test_notebook_has_no_stale_outputs,
         test_notebook_aligns_observations_by_date,

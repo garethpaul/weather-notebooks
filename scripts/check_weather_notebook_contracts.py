@@ -52,6 +52,9 @@ RESPONSE_OFFSET_PLAN_PATH = (
 REDIRECT_BOUNDARY_PLAN_PATH = (
     ROOT / "docs" / "plans" / "2026-06-13-noaa-token-redirect-boundary.md"
 )
+MAKE_ROOT_PROTECTION_PLAN_PATH = (
+    ROOT / "docs" / "plans" / "2026-06-14-make-root-override-protection.md"
+)
 CI_WORKFLOW_PATH = ROOT / ".github" / "workflows" / "check.yml"
 LOCKFILE_SHA256 = {
     "requirements-py312.lock": "47835a6609db0175be86dd3054e5e2334668b35cf0d0d59e45208ef2fc716179",
@@ -425,6 +428,7 @@ def test_completed_plans_are_in_docs_plans():
     assert_completed_plan(METADATA_PAGINATION_PLAN_PATH, "NOAA metadata pagination")
     assert_completed_plan(RESPONSE_OFFSET_PLAN_PATH, "NOAA response offset validation")
     assert_completed_plan(REDIRECT_BOUNDARY_PLAN_PATH, "NOAA token redirect boundary")
+    assert_completed_plan(MAKE_ROOT_PROTECTION_PLAN_PATH, "Make root override protection")
 
 
 def test_dependency_and_ci_contracts():
@@ -488,10 +492,12 @@ def test_dependency_and_ci_contracts():
     assert_true(workflow_files == [CI_WORKFLOW_PATH], "check.yml must be the only workflow")
 
     makefile = (ROOT / "Makefile").read_text()
+    makefile_lines = set(makefile.splitlines())
     assert_true(
-        "ROOT := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))" in makefile,
-        "Makefile must resolve the repository from its own path",
+        "override ROOT := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))" in makefile_lines,
+        "Makefile must protect the repository resolved from its own path",
     )
+    assert_true("PYTHON ?= python3" in makefile_lines, "Makefile must preserve the Python command override")
     assert_true("$(ROOT)/scripts/check_weather_notebook_contracts.py" in makefile, "Makefile must use the rooted contract path")
     assert_true('find "$(ROOT)"' in makefile, "Makefile cleanup must stay inside the repository")
     assert_true('$(MAKE) -C "$(ROOT)" clean' in makefile, "recursive cleanup must stay rooted")

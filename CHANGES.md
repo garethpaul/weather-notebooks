@@ -1,5 +1,13 @@
 # Changes
 
+## 2026-06-14
+
+- Added offline synthetic NOAA analysis-flow coverage from fake API responses
+  through observation bucketing, converted dataframe rows, and a headless
+  average-temperature plot.
+- Extracted deterministic dataframe row construction for shared notebook and
+  executable-test use.
+
 ## 2026-06-13
 
 - Disabled redirects on token-bearing NOAA requests so provider credentials

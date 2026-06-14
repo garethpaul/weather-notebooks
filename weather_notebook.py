@@ -134,3 +134,28 @@ def mm_to_inches(value):
     if number is None:
         return None
     return number / 25.4
+
+
+def build_weather_rows(weather_by_date):
+    rows = []
+    for date, values in sorted(weather_by_date.items()):
+        parsed_date = parse_noaa_date(date)
+        if parsed_date is None:
+            continue
+        avg_temp = c_to_f(values.get("TAVG"))
+        min_temp = c_to_f(values.get("TMIN"))
+        max_temp = c_to_f(values.get("TMAX"))
+        precipitation = mm_to_inches(values.get("PRCP"))
+        if all(value is None for value in (avg_temp, min_temp, max_temp, precipitation)):
+            continue
+        rows.append({
+            "date": parsed_date,
+            "avgTemp": avg_temp,
+            "minTemp": min_temp,
+            "maxTemp": max_temp,
+            "prcp": precipitation,
+        })
+
+    if not rows:
+        raise ValueError("No valid NOAA observations were available")
+    return rows

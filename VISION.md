@@ -32,12 +32,13 @@ Priority:
 - Keep GitHub Actions running the offline `make check` baseline before review
 - Avoid presenting historical data as current conditions
 - Keep the scientific environment exactly pinned and import-verified in CI
+- Exercise the complete offline analysis flow from synthetic NOAA responses
+  through dataframe construction and a headless average-temperature plot
 
 Next priorities:
 
 - Add README setup notes and dependency requirements
 - Document station and date-range choices
-- Extract NOAA fetching into a testable Python module
 - Add data-source timestamps to generated outputs
 
 Contribution rules:

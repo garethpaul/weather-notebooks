@@ -1,5 +1,5 @@
 PYTHON ?= python3
-ROOT := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
+override ROOT := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 CONTRACT_SCRIPT := $(ROOT)/scripts/check_weather_notebook_contracts.py
 PYTHON_FILES := $(ROOT)/weather_notebook.py $(ROOT)/weather_notebook_tests.py $(CONTRACT_SCRIPT)
 

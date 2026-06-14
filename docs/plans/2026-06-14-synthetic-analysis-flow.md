@@ -1,6 +1,6 @@
 # Synthetic Weather Analysis Flow
 
-## Status: Planned
+## Status: Completed
 
 ## Context
 
@@ -39,3 +39,24 @@ live token.
 - Do not make live NOAA requests or commit tokens, refreshed datasets, images,
   execution counts, or notebook outputs.
 - Do not merge or close stacked pull requests without owner authorization.
+
+## Work Completed
+
+- Extracted deterministic date-aligned row construction into the existing
+  runtime module and made the notebook call it.
+- Added offline fake-response integration coverage through pandas dataframe
+  construction and a headless matplotlib line plot.
+- Added static contracts for helper use, test scope, roadmap priority, suite
+  registration, and completed-plan evidence.
+
+## Verification
+
+- Focused row-helper, synthetic-flow, and static contract tests passed.
+- Repository and external-directory `make check` passed.
+- Twelve hostile helper, ordering, conversion, empty-result, dataframe, plot,
+  offline, headless-backend, roadmap, suite, notebook, and plan-status
+  mutations were rejected.
+- The reviewed Python 3.12 hash lock installed successfully, `pip check` passed,
+  and notebook JSON/output, artifact, credential, and exact-diff audits passed.
+  Hosted verification is recorded against the exact pull-request head after
+  push.

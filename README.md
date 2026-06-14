@@ -69,7 +69,9 @@ The setup commands above are derived from repository files. Legacy mobile, Pytho
 - The hosted matrix also reruns `make check` from an external working directory.
 - `python3 scripts/check_weather_notebook_contracts.py` runs just the notebook contracts.
 - `python3 -m unittest weather_notebook_tests` runs the executable NOAA helper
-  tests without a token or network request.
+  tests plus an offline synthetic flow through fake responses, date bucketing,
+  converted pandas rows, and a headless matplotlib line plot without a token or
+  network request.
 - `make lock` regenerates reviewed Python 3.12 and 3.14 Linux lockfiles with
   SHA-256 hashes from the five direct pins in `requirements.txt`.
 - Hosted installs use pip `--require-hashes` against the matrix-matched lock;
@@ -130,6 +132,8 @@ When the required SDK or runtime is unavailable, use static checks and source re
   optional response offsets before accumulating NOAA pages.
 - See `docs/plans/2026-06-13-noaa-token-redirect-boundary.md` for keeping the
   NOAA token on the configured API origin.
+- See `docs/plans/2026-06-14-synthetic-analysis-flow.md` for deterministic
+  offline dataframe and plotting coverage.
 
 ## Contributing
 

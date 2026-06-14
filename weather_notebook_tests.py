@@ -315,6 +315,89 @@ class WeatherNotebookTest(unittest.TestCase):
             with self.subTest(value=value):
                 self.assertIsNone(weather_notebook.parse_noaa_date(value))
 
+    def test_build_weather_rows_sorts_converts_and_skips_invalid_rows(self):
+        weather_by_date = {
+            "bad-date": {"TAVG": 10},
+            "2019-01-02T00:00:00": {"TAVG": 20, "PRCP": 25.4},
+            "2019-01-01T00:00:00": {"TMIN": 0, "TMAX": 10},
+            "2019-01-03T00:00:00": {"TAVG": float("nan")},
+        }
+
+        rows = weather_notebook.build_weather_rows(weather_by_date)
+
+        self.assertEqual([row["date"] for row in rows], [
+            datetime(2019, 1, 1),
+            datetime(2019, 1, 2),
+        ])
+        self.assertEqual(rows[0]["minTemp"], 32.0)
+        self.assertEqual(rows[0]["maxTemp"], 50.0)
+        self.assertEqual(rows[1]["avgTemp"], 68.0)
+        self.assertEqual(rows[1]["prcp"], 1.0)
+
+    def test_build_weather_rows_rejects_empty_analysis(self):
+        with self.assertRaisesRegex(ValueError, "No valid NOAA observations"):
+            weather_notebook.build_weather_rows({
+                "bad-date": {"TAVG": 10},
+                "2019-01-01T00:00:00": {"TAVG": float("inf")},
+            })
+
+    def test_synthetic_analysis_flow_builds_dataframe_and_plot(self):
+        import matplotlib
+        matplotlib.use("Agg", force=True)
+        import pandas as pd
+        from matplotlib import pyplot as plt
+
+        observations = {
+            ("TAVG", "TMAX"): [
+                {"date": "2019-01-02T00:00:00", "datatype": "TAVG", "value": 20},
+                {"date": "2019-01-01T00:00:00", "datatype": "TAVG", "value": 10},
+                {"date": "2019-01-01T00:00:00", "datatype": "TMAX", "value": 15},
+            ],
+            ("TMIN", "PRCP"): [
+                {"date": "2019-01-01T00:00:00", "datatype": "TMIN", "value": 5},
+                {"date": "2019-01-02T00:00:00", "datatype": "PRCP", "value": 25.4},
+            ],
+        }
+        calls = []
+
+        def fake_get(url, headers, params, timeout, allow_redirects):
+            self.assertEqual(url, weather_notebook.NOAA_API_URL)
+            self.assertFalse(allow_redirects)
+            calls.append(tuple(params["datatypeid"]))
+            results = observations[tuple(params["datatypeid"])]
+            return FakeResponse({
+                "results": results,
+                "metadata": {"resultset": {"count": len(results), "offset": 1}},
+            })
+
+        weather_by_date = {}
+        for datatypes in (("TAVG", "TMAX"), ("TMIN", "PRCP")):
+            results = weather_notebook.fetch_noaa_data(
+                2019, datatypes, "synthetic-token", "synthetic-station", requests_get=fake_get
+            )
+            for item in results:
+                weather_notebook.record_observation(item, weather_by_date)
+
+        rows = weather_notebook.build_weather_rows(weather_by_date)
+        dataframe = pd.DataFrame(
+            rows,
+            columns=["date", "avgTemp", "minTemp", "maxTemp", "prcp"],
+        )
+        axes = dataframe.plot(kind="line", x="date", y="avgTemp")
+
+        self.assertEqual(calls, [("TAVG", "TMAX"), ("TMIN", "PRCP")])
+        self.assertEqual(list(dataframe.columns), [
+            "date", "avgTemp", "minTemp", "maxTemp", "prcp"
+        ])
+        self.assertEqual(list(dataframe["date"]), [
+            datetime(2019, 1, 1),
+            datetime(2019, 1, 2),
+        ])
+        self.assertEqual(list(dataframe["avgTemp"]), [50.0, 68.0])
+        self.assertEqual(len(axes.lines), 1)
+        self.assertEqual(axes.get_xlabel(), "date")
+        plt.close(axes.figure)
+
 
 if __name__ == "__main__":
     unittest.main()

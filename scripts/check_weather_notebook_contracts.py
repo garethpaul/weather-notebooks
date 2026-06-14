@@ -55,6 +55,9 @@ REDIRECT_BOUNDARY_PLAN_PATH = (
 MAKE_ROOT_PROTECTION_PLAN_PATH = (
     ROOT / "docs" / "plans" / "2026-06-14-make-root-override-protection.md"
 )
+SYNTHETIC_ANALYSIS_PLAN_PATH = (
+    ROOT / "docs" / "plans" / "2026-06-14-synthetic-analysis-flow.md"
+)
 CI_WORKFLOW_PATH = ROOT / ".github" / "workflows" / "check.yml"
 LOCKFILE_SHA256 = {
     "requirements-py312.lock": "47835a6609db0175be86dd3054e5e2334668b35cf0d0d59e45208ef2fc716179",
@@ -294,8 +297,15 @@ def test_notebook_has_no_stale_outputs():
 
 def test_notebook_aligns_observations_by_date():
     source = project_source()
+    notebook = notebook_source(load_notebook())
     assert_true("weather_by_date = {}" in source, "notebook must collect NOAA observations by date")
     assert_true("def record_observation(item, weather_by_date):" in source, "notebook must centralize observation recording")
+    assert_true("def build_weather_rows(weather_by_date):" in source, "row construction must be importable")
+    assert_true(
+        "for date, values in sorted(weather_by_date.items()):" in source,
+        "row construction must preserve chronological date ordering",
+    )
+    assert_true("rows = build_weather_rows(weather_by_date)" in notebook, "notebook must use shared row construction")
     assert_true(".setdefault(date, {})" in source, "notebook must merge datatype values into a date bucket")
     assert_true(
         'pd.DataFrame(rows, columns=["date", "avgTemp", "minTemp", "maxTemp", "prcp"])' in source,
@@ -345,7 +355,8 @@ def test_notebook_guards_observation_dates_and_values():
 
 
 def test_notebook_rejects_empty_valid_observation_rows():
-    source = notebook_source(load_notebook())
+    source = RUNTIME_MODULE.read_text()
+    notebook = notebook_source(load_notebook())
     assert_true(
         "if not rows:" in source,
         "notebook must detect when all NOAA observation rows were skipped",
@@ -355,16 +366,18 @@ def test_notebook_rejects_empty_valid_observation_rows():
         "empty NOAA observation sets must raise an explicit error",
     )
     assert_true(
-        source.index("if not rows:")
-        < source.index(
-            'pd.DataFrame(rows, columns=["date", "avgTemp", "minTemp", "maxTemp", "prcp"])'
-        ),
-        "notebook must reject empty row sets before dataframe construction",
+        source.index("if not rows:") < source.index("return rows"),
+        "row helper must reject empty row sets before returning",
+    )
+    assert_true(
+        notebook.index("rows = build_weather_rows(weather_by_date)")
+        < notebook.index('pd.DataFrame(rows, columns=["date", "avgTemp", "minTemp", "maxTemp", "prcp"])'),
+        "notebook must build validated rows before dataframe construction",
     )
 
 
 def test_notebook_skips_rows_without_measurements():
-    source = notebook_source(load_notebook())
+    source = RUNTIME_MODULE.read_text()
     assert_true(
         'avg_temp = c_to_f(values.get("TAVG"))' in source,
         "row building must store converted average temperature before append",
@@ -429,6 +442,49 @@ def test_completed_plans_are_in_docs_plans():
     assert_completed_plan(RESPONSE_OFFSET_PLAN_PATH, "NOAA response offset validation")
     assert_completed_plan(REDIRECT_BOUNDARY_PLAN_PATH, "NOAA token redirect boundary")
     assert_completed_plan(MAKE_ROOT_PROTECTION_PLAN_PATH, "Make root override protection")
+    assert_completed_plan(SYNTHETIC_ANALYSIS_PLAN_PATH, "synthetic analysis flow")
+    checker_main = Path(__file__).read_text().rsplit("def main():", 1)[1]
+    assert_true(
+        "test_synthetic_analysis_flow_is_exercised," in checker_main,
+        "synthetic analysis-flow contract must run in the main suite",
+    )
+
+
+def test_synthetic_analysis_flow_is_exercised():
+    tests = RUNTIME_TESTS.read_text()
+    flow_test = tests.split(
+        "def test_synthetic_analysis_flow_builds_dataframe_and_plot(self):", 1
+    )[1].split("\n\nif __name__", 1)[0]
+    notebook = notebook_source(load_notebook())
+    vision = (ROOT / "VISION.md").read_text()
+    changes = (ROOT / "CHANGES.md").read_text()
+
+    assert_true(
+        "def test_synthetic_analysis_flow_builds_dataframe_and_plot(self):" in tests,
+        "synthetic analysis test must remain defined",
+    )
+    for contract in (
+        'matplotlib.use("Agg", force=True)',
+        "requests_get=fake_get",
+        "record_observation(item, weather_by_date)",
+        "build_weather_rows(weather_by_date)",
+        "pd.DataFrame(",
+        'dataframe.plot(kind="line", x="date", y="avgTemp")',
+        "plt.close(axes.figure)",
+    ):
+        assert_true(contract in flow_test, "synthetic analysis test must include {0}".format(contract))
+    assert_true(
+        "rows = build_weather_rows(weather_by_date)" in notebook,
+        "notebook must use the integration-tested row helper",
+    )
+    assert_true(
+        "Exercise the complete offline analysis flow" in vision,
+        "VISION must preserve synthetic analysis coverage",
+    )
+    assert_true(
+        "offline synthetic NOAA analysis-flow coverage" in changes,
+        "CHANGES must record synthetic analysis coverage",
+    )
 
 
 def test_dependency_and_ci_contracts():
@@ -540,6 +596,7 @@ def main():
         test_notebook_rejects_empty_valid_observation_rows,
         test_notebook_skips_rows_without_measurements,
         test_completed_plans_are_in_docs_plans,
+        test_synthetic_analysis_flow_is_exercised,
         test_dependency_and_ci_contracts,
     ]
     for test in tests:

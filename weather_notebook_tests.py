@@ -1,5 +1,5 @@
 import unittest
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 
 import weather_notebook
 
@@ -20,6 +20,46 @@ class FakeResponse:
 
 
 class WeatherNotebookTest(unittest.TestCase):
+    def test_analysis_provenance_normalizes_station_range_and_utc_time(self):
+        retrieved_at = datetime(
+            2026, 6, 16, 5, 30, 45, 999999,
+            tzinfo=timezone(timedelta(hours=2)),
+        )
+
+        title = weather_notebook.format_analysis_provenance(
+            "  GHCND:US1CAMR0037  ", 2019, 2020, retrieved_at
+        )
+
+        self.assertEqual(
+            title,
+            "NOAA CDO GHCND:US1CAMR0037 | 2019-01-01 to 2019-12-31 | "
+            "retrieved 2026-06-16T03:30:45Z",
+        )
+
+    def test_analysis_provenance_rejects_ambiguous_inputs(self):
+        aware_time = datetime(2026, 6, 16, tzinfo=timezone.utc)
+        invalid_inputs = [
+            (None, 2019, 2020, aware_time),
+            ("   ", 2019, 2020, aware_time),
+            ("station", True, 2020, aware_time),
+            ("station", 999, 2020, aware_time),
+            ("station", 2020, 2020, aware_time),
+            ("station", 2019, 10000, aware_time),
+            ("station", 2019, 2020, "2026-06-16T00:00:00Z"),
+            ("station", 2019, 2020, datetime(2026, 6, 16)),
+        ]
+
+        for station_id, start_year, end_year, retrieved_at in invalid_inputs:
+            with self.subTest(
+                    station_id=station_id,
+                    start_year=start_year,
+                    end_year=end_year,
+                    retrieved_at=retrieved_at):
+                with self.assertRaises(ValueError):
+                    weather_notebook.format_analysis_provenance(
+                        station_id, start_year, end_year, retrieved_at
+                    )
+
     def test_fetch_rejects_invalid_inputs_before_request(self):
         calls = []
 
@@ -421,6 +461,14 @@ class WeatherNotebookTest(unittest.TestCase):
             columns=["date", "avgTemp", "minTemp", "maxTemp", "prcp"],
         )
         axes = dataframe.plot(kind="line", x="date", y="avgTemp")
+        axes.set_title(weather_notebook.format_analysis_provenance(
+            "synthetic-station",
+            2019,
+            2020,
+            datetime(2026, 6, 16, 3, 30, 45, tzinfo=timezone.utc),
+        ))
+        axes.set_xlabel("Observation date")
+        axes.set_ylabel("Average temperature (degrees F)")
 
         self.assertEqual(calls, [("TAVG", "TMAX"), ("TMIN", "PRCP")])
         self.assertEqual(list(dataframe.columns), [
@@ -432,7 +480,13 @@ class WeatherNotebookTest(unittest.TestCase):
         ])
         self.assertEqual(list(dataframe["avgTemp"]), [50.0, 68.0])
         self.assertEqual(len(axes.lines), 1)
-        self.assertEqual(axes.get_xlabel(), "date")
+        self.assertEqual(
+            axes.get_title(),
+            "NOAA CDO synthetic-station | 2019-01-01 to 2019-12-31 | "
+            "retrieved 2026-06-16T03:30:45Z",
+        )
+        self.assertEqual(axes.get_xlabel(), "Observation date")
+        self.assertEqual(axes.get_ylabel(), "Average temperature (degrees F)")
         plt.close(axes.figure)
 
 

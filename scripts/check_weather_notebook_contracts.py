@@ -61,6 +61,9 @@ SYNTHETIC_ANALYSIS_PLAN_PATH = (
 CONFLICTING_OBSERVATION_PLAN_PATH = (
     ROOT / "docs" / "plans" / "2026-06-16-conflicting-noaa-observations.md"
 )
+ANALYSIS_PROVENANCE_PLAN_PATH = (
+    ROOT / "docs" / "plans" / "2026-06-16-weather-analysis-provenance.md"
+)
 CI_WORKFLOW_PATH = ROOT / ".github" / "workflows" / "check.yml"
 LOCKFILE_SHA256 = {
     "requirements-py312.lock": "47835a6609db0175be86dd3054e5e2334668b35cf0d0d59e45208ef2fc716179",
@@ -497,6 +500,7 @@ def test_completed_plans_are_in_docs_plans():
     assert_completed_plan(MAKE_ROOT_PROTECTION_PLAN_PATH, "Make root override protection")
     assert_completed_plan(SYNTHETIC_ANALYSIS_PLAN_PATH, "synthetic analysis flow")
     assert_completed_plan(CONFLICTING_OBSERVATION_PLAN_PATH, "conflicting NOAA observations")
+    assert_completed_plan(ANALYSIS_PROVENANCE_PLAN_PATH, "weather analysis provenance")
     checker_main = Path(__file__).read_text().rsplit("def main():", 1)[1]
     assert_true(
         "test_synthetic_analysis_flow_is_exercised," in checker_main,
@@ -543,6 +547,60 @@ def test_synthetic_analysis_flow_is_exercised():
         "offline synthetic NOAA analysis-flow coverage" in changes,
         "CHANGES must record synthetic analysis coverage",
     )
+
+
+def test_analysis_provenance_is_visible_and_deterministic():
+    runtime = RUNTIME_MODULE.read_text()
+    tests = RUNTIME_TESTS.read_text()
+    notebook = notebook_source(load_notebook())
+    readme = " ".join((ROOT / "README.md").read_text().split())
+    security = " ".join((ROOT / "SECURITY.md").read_text().split())
+    vision = " ".join((ROOT / "VISION.md").read_text().split())
+    changes = " ".join((ROOT / "CHANGES.md").read_text().split())
+
+    for contract in (
+        "def format_analysis_provenance(",
+        "retrieved_at.astimezone(timezone.utc)",
+        'isoformat(timespec="seconds")',
+        '.replace("+00:00", "Z")',
+    ):
+        assert_true(contract in runtime, "runtime provenance helper must include {0}".format(contract))
+    for contract in (
+        "test_analysis_provenance_normalizes_station_range_and_utc_time",
+        "test_analysis_provenance_rejects_ambiguous_inputs",
+        'axes.set_title(weather_notebook.format_analysis_provenance(',
+        'axes.set_xlabel("Observation date")',
+        'axes.set_ylabel("Average temperature (degrees F)")',
+    ):
+        assert_true(contract in tests, "runtime provenance tests must include {0}".format(contract))
+    for contract in (
+        "from datetime import datetime, timezone",
+        "format_analysis_provenance",
+        "RETRIEVED_AT = datetime.now(timezone.utc)",
+        "axes.set_title(format_analysis_provenance(",
+        'axes.set_xlabel("Observation date")',
+        'axes.set_ylabel("Average temperature (degrees F)")',
+    ):
+        assert_true(contract in notebook, "notebook provenance flow must include {0}".format(contract))
+    assert_true(
+        notebook.index("record_observation(item, weather_by_date)") <
+        notebook.index("RETRIEVED_AT = datetime.now(timezone.utc)") <
+        notebook.index("rows = build_weather_rows(weather_by_date)"),
+        "retrieval completion time must be captured after NOAA collection and before plotting",
+    )
+    assert_true("repository's original sample selection" in readme,
+                "README must explain the station choice")
+    assert_true("keeps the analysis bounded and historical" in readme,
+                "README must explain the date-range choice")
+    assert_true("UTC retrieval completion time" in security, "SECURITY must preserve plot provenance")
+    assert_true("Include NOAA source, station, historical range" in vision,
+                "VISION must preserve generated plot provenance")
+    assert_true("deterministic provenance validation" in changes,
+                "CHANGES must record provenance validation")
+    assert_true("Document station and date-range choices" not in vision,
+                "completed station/date documentation must leave next priorities")
+    assert_true("Add data-source timestamps to generated outputs" not in vision,
+                "completed output timestamps must leave next priorities")
 
 
 def test_dependency_and_ci_contracts():
@@ -656,6 +714,7 @@ def main():
         test_notebook_skips_rows_without_measurements,
         test_completed_plans_are_in_docs_plans,
         test_synthetic_analysis_flow_is_exercised,
+        test_analysis_provenance_is_visible_and_deterministic,
         test_dependency_and_ci_contracts,
     ]
     for test in tests:

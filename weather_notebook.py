@@ -1,5 +1,5 @@
 import math
-from datetime import datetime
+from datetime import datetime, timezone
 
 import requests
 
@@ -9,6 +9,33 @@ REQUEST_TIMEOUT_SECONDS = 10
 NOAA_PAGE_LIMIT = 1000
 MAX_NOAA_PAGES = 20
 SUPPORTED_DATATYPES = {"TAVG", "TMIN", "TMAX", "PRCP"}
+
+
+def format_analysis_provenance(station_id, start_year, end_year_exclusive, retrieved_at):
+    if not isinstance(station_id, str) or not station_id.strip():
+        raise ValueError("station_id must be nonblank text")
+    if (
+            isinstance(start_year, bool) or not isinstance(start_year, int) or
+            isinstance(end_year_exclusive, bool) or not isinstance(end_year_exclusive, int) or
+            start_year < 1000 or end_year_exclusive > 9999 or
+            start_year >= end_year_exclusive):
+        raise ValueError("analysis years must define a valid four-digit range")
+    if not isinstance(retrieved_at, datetime):
+        raise ValueError("retrieved_at must be a datetime")
+    if retrieved_at.tzinfo is None or retrieved_at.utcoffset() is None:
+        raise ValueError("retrieved_at must include a timezone")
+
+    retrieved_utc = retrieved_at.astimezone(timezone.utc)
+    retrieved_text = retrieved_utc.isoformat(timespec="seconds").replace("+00:00", "Z")
+    return (
+        "NOAA CDO {0} | {1}-01-01 to {2}-12-31 | retrieved {3}"
+        .format(
+            station_id.strip(),
+            start_year,
+            end_year_exclusive - 1,
+            retrieved_text,
+        )
+    )
 
 
 def fetch_noaa_data(year, datatype_ids, token, station_id, requests_get=None):

@@ -6,6 +6,10 @@
   an earlier value while keeping identical repeated records idempotent.
 - Added executable and static contracts for conflict detection and
   pre-mutation ordering.
+- Added NOAA source, normalized station, inclusive historical range, and UTC
+  retrieval completion time to the average-temperature plot title.
+- Added explicit observation-date and Fahrenheit axis labels plus deterministic
+  provenance validation in the offline synthetic plot flow.
 
 ## 2026-06-14
 

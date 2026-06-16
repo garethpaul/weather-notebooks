@@ -48,6 +48,9 @@ requested record before page results are accumulated.
 Token-bearing NOAA requests must not follow redirects; redirect responses are
 rejected before response bodies are parsed so the provider-specific `token`
 header stays on the configured API origin.
+Generated analysis plots should retain NOAA source, station, observation range,
+UTC retrieval completion time, and display units. This context reduces the risk
+that a historical sample is redistributed as current or representative data.
 
 ## Dependency and Supply Chain Security
 

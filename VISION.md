@@ -35,12 +35,12 @@ Priority:
 - Keep the scientific environment exactly pinned and import-verified in CI
 - Exercise the complete offline analysis flow from synthetic NOAA responses
   through dataframe construction and a headless average-temperature plot
+- Include NOAA source, station, historical range, UTC retrieval completion
+  time, and display units in generated plot context
 
 Next priorities:
 
 - Add README setup notes and dependency requirements
-- Document station and date-range choices
-- Add data-source timestamps to generated outputs
 
 Contribution rules:
 

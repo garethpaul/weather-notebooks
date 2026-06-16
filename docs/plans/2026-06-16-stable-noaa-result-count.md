@@ -1,6 +1,6 @@
 # Require Stable NOAA Result Counts Across Pages
 
-## Status: Planned
+## Status: Completed
 
 ## Context
 
@@ -54,3 +54,27 @@ logical snapshots or stop against a later count without detecting drift.
 
 No live NOAA token or request is used. Deterministic fake responses verify the
 client contract; NOAA service-side consistency remains external.
+
+## Work Completed
+
+- Pinned the first reported NOAA result count and rejected later non-null count
+  drift before accumulating the affected page.
+- Preserved metadata-optional pagination, including later pages that omit
+  metadata after a count has been established.
+- Added focused runtime regressions, mutation-sensitive static contracts, and
+  maintained user, security, roadmap, and change guidance.
+
+## Verification Completed
+
+- Four focused pagination tests passed, covering increasing and decreasing
+  drift, stable metadata, and later metadata omission.
+- The complete 26-test `weather_notebook_tests` suite passed.
+- `py_compile` passed for the runtime module, tests, and static checker.
+- The repository and external-directory non-cleaning `make verify` payloads
+  each passed with 26 runtime tests and 20 static contracts. The broad-cleaning
+  `make check` wrapper is not run because workspace policy forbids broad
+  generated-artifact deletion; its verification payload is `make verify`.
+- Eight isolated mutations were rejected for removed pinning, inverted drift
+  comparison, post-accumulation validation, missing runtime coverage, missing
+  checker registration, weakened guidance, reopened plan status, and rejected
+  later-page metadata omission.

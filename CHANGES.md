@@ -2,6 +2,8 @@
 
 ## 2026-06-16
 
+- Rejected NOAA result-count drift across paginated responses before later
+  observations can alter the accumulated analysis.
 - Rejected conflicting duplicate NOAA observations before they can overwrite
   an earlier value while keeping identical repeated records idempotent.
 - Added executable and static contracts for conflict detection and

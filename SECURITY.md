@@ -69,3 +69,5 @@ Good-faith research is welcome when it stays within these boundaries:
 ## Maintainer Response
 
 The maintainer will review complete reports as availability allows, prioritize issues by exploitability and impact, and coordinate a fix or mitigation when the affected code is still maintained. For sample, archived, or educational repositories, the likely remediation may be documentation, dependency updates, or clearly marking unsupported code rather than a production-style patch release.
+NOAA result-count changes fail before later pages are accumulated, preventing
+one analysis from silently combining inconsistent pagination snapshots.

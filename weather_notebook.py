@@ -56,6 +56,7 @@ def fetch_noaa_data(year, datatype_ids, token, station_id, requests_get=None):
     station_id = station_id.strip()
     all_results = []
     next_offset = 1
+    expected_result_count = None
     for _page_index in range(MAX_NOAA_PAGES):
         params = {
             "datasetid": "GHCND",
@@ -85,12 +86,17 @@ def fetch_noaa_data(year, datatype_ids, token, station_id, requests_get=None):
         result_count, response_offset = resultset or (None, None)
         if response_offset is not None and response_offset != next_offset:
             raise ValueError("NOAA response offset does not match request")
+        if result_count is not None:
+            if expected_result_count is None:
+                expected_result_count = result_count
+            elif result_count != expected_result_count:
+                raise ValueError("NOAA result count changed during pagination")
         all_results.extend(results)
         next_offset += len(results)
-        if result_count is not None:
-            if len(all_results) > result_count:
+        if expected_result_count is not None:
+            if len(all_results) > expected_result_count:
                 raise ValueError("NOAA result count is inconsistent")
-            if len(all_results) == result_count:
+            if len(all_results) == expected_result_count:
                 return all_results
             if not results:
                 raise ValueError("NOAA pagination made no progress")

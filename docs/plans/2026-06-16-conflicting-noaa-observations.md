@@ -1,6 +1,6 @@
 # Conflicting NOAA Observation Guard
 
-Status: In Progress
+Status: Completed
 
 ## Context
 
@@ -55,4 +55,14 @@ replace a valid measurement with malformed or different data.
 
 ## Verification
 
-Pending implementation and validation.
+- The focused executable tests passed for identical duplicate idempotence and
+  conflicting duplicate rejection without accumulated-state mutation.
+- The focused static contract passed for conflict detection, pre-mutation
+  ordering, executable-test presence, notebook-helper parity, and maintained
+  guidance.
+- Repository and external-directory `make check` passed 22 executable tests and
+  18 static contracts; the scientific-stack import emitted only an upstream
+  `python-dateutil` deprecation warning.
+- Seven hostile mutations were rejected across overwrite restoration,
+  inverted conflict comparison, mutation before validation, test removal,
+  contract deregistration, guidance removal, and incomplete-plan status.

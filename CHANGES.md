@@ -1,5 +1,12 @@
 # Changes
 
+## 2026-06-16
+
+- Rejected conflicting duplicate NOAA observations before they can overwrite
+  an earlier value while keeping identical repeated records idempotent.
+- Added executable and static contracts for conflict detection and
+  pre-mutation ordering.
+
 ## 2026-06-14
 
 - Added offline synthetic NOAA analysis-flow coverage from fake API responses

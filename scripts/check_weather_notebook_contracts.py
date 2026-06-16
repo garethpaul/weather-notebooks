@@ -58,6 +58,9 @@ MAKE_ROOT_PROTECTION_PLAN_PATH = (
 SYNTHETIC_ANALYSIS_PLAN_PATH = (
     ROOT / "docs" / "plans" / "2026-06-14-synthetic-analysis-flow.md"
 )
+CONFLICTING_OBSERVATION_PLAN_PATH = (
+    ROOT / "docs" / "plans" / "2026-06-16-conflicting-noaa-observations.md"
+)
 CI_WORKFLOW_PATH = ROOT / ".github" / "workflows" / "check.yml"
 LOCKFILE_SHA256 = {
     "requirements-py312.lock": "47835a6609db0175be86dd3054e5e2334668b35cf0d0d59e45208ef2fc716179",
@@ -324,8 +327,58 @@ def test_notebook_rejects_non_text_observation_keys():
     assert_true(
         source.index("if not isinstance(date, str) or not isinstance(datatype, str):")
         < source.index("if not date or datatype not in SUPPORTED_DATATYPES:")
-        < source.index("weather_by_date.setdefault(date, {})[datatype]"),
+        < source.index("observations = weather_by_date.setdefault(date, {})"),
         "NOAA observation key type guard must run before set membership and bucketing",
+    )
+
+
+def test_conflicting_observations_fail_before_mutation():
+    source = RUNTIME_MODULE.read_text()
+    method = source.split("def record_observation", 1)[1].split(
+        "def parse_noaa_date", 1
+    )[0]
+    tests = RUNTIME_TESTS.read_text()
+    notebook = notebook_source(load_notebook())
+    vision = (ROOT / "VISION.md").read_text()
+    changes = (ROOT / "CHANGES.md").read_text()
+
+    required_source = (
+        'observations = weather_by_date.setdefault(date, {})',
+        'value = item.get("value")',
+        'if datatype in observations and observations[datatype] != value:',
+        'raise ValueError("Conflicting NOAA observation for date and datatype")',
+        'observations[datatype] = value',
+    )
+    for contract in required_source:
+        assert_true(
+            contract in method,
+            "duplicate observation guard must include {0}".format(contract),
+        )
+    assert_true(
+        method.index("if datatype in observations and observations[datatype] != value:")
+        < method.index('observations[datatype] = value'),
+        "duplicate observation conflicts must fail before mutation",
+    )
+    for test_name in (
+        "test_record_observation_accepts_identical_duplicate",
+        "test_record_observation_rejects_conflicting_duplicate_without_mutation",
+    ):
+        assert_true(
+            "def {0}(self):".format(test_name) in tests,
+            "duplicate observation tests must remain defined",
+        )
+    assert_true(
+        "from weather_notebook import build_weather_rows, fetch_noaa_data, record_observation"
+        in notebook,
+        "notebook must continue using the guarded observation helper",
+    )
+    assert_true(
+        "conflicting duplicate NOAA observations" in vision,
+        "VISION must preserve conflict rejection",
+    )
+    assert_true(
+        "conflicting duplicate NOAA observations" in changes,
+        "CHANGES must record conflict rejection",
     )
 
 
@@ -443,10 +496,15 @@ def test_completed_plans_are_in_docs_plans():
     assert_completed_plan(REDIRECT_BOUNDARY_PLAN_PATH, "NOAA token redirect boundary")
     assert_completed_plan(MAKE_ROOT_PROTECTION_PLAN_PATH, "Make root override protection")
     assert_completed_plan(SYNTHETIC_ANALYSIS_PLAN_PATH, "synthetic analysis flow")
+    assert_completed_plan(CONFLICTING_OBSERVATION_PLAN_PATH, "conflicting NOAA observations")
     checker_main = Path(__file__).read_text().rsplit("def main():", 1)[1]
     assert_true(
         "test_synthetic_analysis_flow_is_exercised," in checker_main,
         "synthetic analysis-flow contract must run in the main suite",
+    )
+    assert_true(
+        "test_conflicting_observations_fail_before_mutation," in checker_main,
+        "conflicting observation contract must run in the main suite",
     )
 
 
@@ -592,6 +650,7 @@ def main():
         test_notebook_has_no_stale_outputs,
         test_notebook_aligns_observations_by_date,
         test_notebook_rejects_non_text_observation_keys,
+        test_conflicting_observations_fail_before_mutation,
         test_notebook_guards_observation_dates_and_values,
         test_notebook_rejects_empty_valid_observation_rows,
         test_notebook_skips_rows_without_measurements,

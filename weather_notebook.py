@@ -100,7 +100,11 @@ def record_observation(item, weather_by_date):
         return
     if not date or datatype not in SUPPORTED_DATATYPES:
         return
-    weather_by_date.setdefault(date, {})[datatype] = item.get("value")
+    observations = weather_by_date.setdefault(date, {})
+    value = item.get("value")
+    if datatype in observations and observations[datatype] != value:
+        raise ValueError("Conflicting NOAA observation for date and datatype")
+    observations[datatype] = value
 
 
 def parse_noaa_date(value):

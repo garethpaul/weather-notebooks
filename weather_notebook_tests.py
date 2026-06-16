@@ -289,6 +289,43 @@ class WeatherNotebookTest(unittest.TestCase):
             {"2019-01-01T00:00:00": {"TAVG": 12.5, "PRCP": 2.0}},
         )
 
+    def test_record_observation_accepts_identical_duplicate(self):
+        weather_by_date = {}
+        observation = {
+            "date": "2019-01-01T00:00:00",
+            "datatype": "TAVG",
+            "value": 12.5,
+        }
+
+        weather_notebook.record_observation(observation, weather_by_date)
+        weather_notebook.record_observation(dict(observation), weather_by_date)
+
+        self.assertEqual(
+            weather_by_date,
+            {"2019-01-01T00:00:00": {"TAVG": 12.5}},
+        )
+
+    def test_record_observation_rejects_conflicting_duplicate_without_mutation(self):
+        weather_by_date = {
+            "2019-01-01T00:00:00": {"TAVG": 12.5, "PRCP": 2.0},
+        }
+        before = {
+            date: dict(values) for date, values in weather_by_date.items()
+        }
+
+        for conflicting_value in (13.0, "bad"):
+            with self.subTest(conflicting_value=conflicting_value):
+                with self.assertRaisesRegex(ValueError, "Conflicting NOAA observation"):
+                    weather_notebook.record_observation(
+                        {
+                            "date": "2019-01-01T00:00:00",
+                            "datatype": "TAVG",
+                            "value": conflicting_value,
+                        },
+                        weather_by_date,
+                    )
+                self.assertEqual(weather_by_date, before)
+
     def test_record_observation_ignores_invalid_keys_and_datatypes(self):
         weather_by_date = {}
         invalid_items = [

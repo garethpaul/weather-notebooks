@@ -69,8 +69,8 @@ STABLE_RESULT_COUNT_PLAN_PATH = (
 )
 CI_WORKFLOW_PATH = ROOT / ".github" / "workflows" / "check.yml"
 LOCKFILE_SHA256 = {
-    "requirements-py312.lock": "47835a6609db0175be86dd3054e5e2334668b35cf0d0d59e45208ef2fc716179",
-    "requirements-py314.lock": "e82f04e40657676dfd0bb057f9158935acb594c053366e91d2f427a5db066b12",
+    "requirements-py312.lock": "552696e4d187043dac40208e56287c27994016e696b27adca9616ad463167e0a",
+    "requirements-py314.lock": "bd4805956fb10e570cc02bc32c4021caef6c553f12a167359fff7e72656165d1",
 }
 
 EXPECTED_WORKFLOW = """name: Check
@@ -708,6 +708,10 @@ def test_dependency_and_ci_contracts():
                 locked_packages.get(name) == version,
                 "{0} must contain active direct pin {1}=={2}".format(lock_name, name, version),
             )
+        assert_true(
+            locked_packages.get("jupyter-server") == "2.20.0",
+            "{0} must contain the reviewed jupyter-server security pin".format(lock_name),
+        )
 
     workflow = CI_WORKFLOW_PATH.read_text()
     assert_true(workflow == EXPECTED_WORKFLOW, "CI workflow must match the fail-closed baseline")

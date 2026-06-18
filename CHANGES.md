@@ -1,5 +1,12 @@
 # Changes
 
+## 2026-06-18
+
+- Updated both hashed Python lockfiles to `jupyter-server` 2.20.0 to remediate
+  CVE-2026-44727 while preserving the existing direct dependency set.
+- Added a fail-closed contract for the reviewed transitive security pin and
+  refreshed both lockfile integrity digests.
+
 ## 2026-06-16
 
 - Rejected NOAA result-count drift across paginated responses before later

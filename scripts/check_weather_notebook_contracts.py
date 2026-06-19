@@ -159,11 +159,19 @@ def test_noaa_requests_are_parameterized_and_bounded():
     assert_true("timeout=REQUEST_TIMEOUT_SECONDS" in source, "NOAA requests must set a timeout")
     assert_true("allow_redirects=False" in source, "NOAA token requests must not follow redirects")
     assert_true(".raise_for_status()" in source, "NOAA responses must fail fast on HTTP errors")
+    assert_true(
+        "response.status_code < 200 or response.status_code >= 300" in source,
+        "NOAA responses must explicitly reject redirects and other non-2xx statuses",
+    )
+    assert_true(
+        'raise ValueError("NOAA response must have a successful status")' in source,
+        "NOAA non-success status failures must be explicit",
+    )
     request_function = RUNTIME_MODULE.read_text().split("def fetch_noaa_data", 1)[1].split(
         "def noaa_resultset", 1
     )[0]
     assert_true(
-        request_function.index("response.raise_for_status()")
+        request_function.index("response.status_code < 200 or response.status_code >= 300")
         < request_function.index("payload = response.json()"),
         "NOAA redirects and HTTP failures must be rejected before JSON parsing",
     )
@@ -446,6 +454,10 @@ def test_notebook_guards_observation_dates_and_values():
     assert_true("if parsed_date is None:" in source, "row building must skip invalid NOAA dates")
     assert_true('"date": parsed_date' in source, "row building must use the guarded date value")
     assert_true("def noaa_number(value):" in source, "notebook must convert NOAA numeric values through a guard helper")
+    assert_true(
+        "isinstance(value, bool)" in source,
+        "NOAA numeric parsing must reject JSON booleans",
+    )
     assert_true("number = noaa_number(value)" in source, "unit conversion must use guarded numeric conversion")
     assert_true("import math" in source, "notebook must import math for finite numeric checks")
     assert_true(

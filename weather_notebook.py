@@ -76,6 +76,8 @@ def fetch_noaa_data(year, datatype_ids, token, station_id, requests_get=None):
             allow_redirects=False,
         )
         response.raise_for_status()
+        if response.status_code < 200 or response.status_code >= 300:
+            raise ValueError("NOAA response must have a successful status")
         payload = response.json()
         if not isinstance(payload, dict):
             raise ValueError("NOAA response must be an object")
@@ -148,7 +150,7 @@ def parse_noaa_date(value):
 
 
 def noaa_number(value):
-    if value is None:
+    if value is None or isinstance(value, bool):
         return None
     try:
         number = float(value)

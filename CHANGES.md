@@ -2,6 +2,10 @@
 
 ## 2026-06-18
 
+- Explicitly rejected NOAA 3xx responses before parsing JSON; Requests does
+  not treat redirects as errors in `raise_for_status()`.
+- Treated JSON boolean observation values as malformed instead of converting
+  them to numeric weather measurements.
 - Updated both hashed Python lockfiles to `jupyter-server` 2.20.0 to remediate
   CVE-2026-44727 while preserving the existing direct dependency set.
 - Added a fail-closed contract for the reviewed transitive security pin and

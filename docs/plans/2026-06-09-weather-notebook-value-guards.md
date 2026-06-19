@@ -21,7 +21,8 @@ malformed API row should not crash the whole exploratory analysis.
 ## Work Completed
 
 - Added `parse_noaa_date` to return `None` for malformed timestamps.
-- Added `noaa_number` to return `None` for missing or non-numeric values.
+- Added `noaa_number` to return `None` for missing, boolean, or non-numeric
+  values.
 - Updated temperature and precipitation conversion helpers to use guarded
   numeric conversion.
 - Skipped rows with invalid dates before building the dataframe.

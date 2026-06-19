@@ -46,10 +46,31 @@ REQUEST_INPUT_PLAN_PATH = (
 METADATA_PAGINATION_PLAN_PATH = (
     ROOT / "docs" / "plans" / "2026-06-13-noaa-metadata-pagination.md"
 )
+RESPONSE_OFFSET_PLAN_PATH = (
+    ROOT / "docs" / "plans" / "2026-06-13-noaa-response-offset-validation.md"
+)
+REDIRECT_BOUNDARY_PLAN_PATH = (
+    ROOT / "docs" / "plans" / "2026-06-13-noaa-token-redirect-boundary.md"
+)
+MAKE_ROOT_PROTECTION_PLAN_PATH = (
+    ROOT / "docs" / "plans" / "2026-06-14-make-root-override-protection.md"
+)
+SYNTHETIC_ANALYSIS_PLAN_PATH = (
+    ROOT / "docs" / "plans" / "2026-06-14-synthetic-analysis-flow.md"
+)
+CONFLICTING_OBSERVATION_PLAN_PATH = (
+    ROOT / "docs" / "plans" / "2026-06-16-conflicting-noaa-observations.md"
+)
+ANALYSIS_PROVENANCE_PLAN_PATH = (
+    ROOT / "docs" / "plans" / "2026-06-16-weather-analysis-provenance.md"
+)
+STABLE_RESULT_COUNT_PLAN_PATH = (
+    ROOT / "docs" / "plans" / "2026-06-16-stable-noaa-result-count.md"
+)
 CI_WORKFLOW_PATH = ROOT / ".github" / "workflows" / "check.yml"
 LOCKFILE_SHA256 = {
-    "requirements-py312.lock": "47835a6609db0175be86dd3054e5e2334668b35cf0d0d59e45208ef2fc716179",
-    "requirements-py314.lock": "e82f04e40657676dfd0bb057f9158935acb594c053366e91d2f427a5db066b12",
+    "requirements-py312.lock": "552696e4d187043dac40208e56287c27994016e696b27adca9616ad463167e0a",
+    "requirements-py314.lock": "bd4805956fb10e570cc02bc32c4021caef6c553f12a167359fff7e72656165d1",
 }
 
 EXPECTED_WORKFLOW = """name: Check
@@ -136,7 +157,29 @@ def test_noaa_requests_are_parameterized_and_bounded():
     source = project_source()
     assert_true("params=" in source, "NOAA requests must use structured query parameters")
     assert_true("timeout=REQUEST_TIMEOUT_SECONDS" in source, "NOAA requests must set a timeout")
+    assert_true("allow_redirects=False" in source, "NOAA token requests must not follow redirects")
     assert_true(".raise_for_status()" in source, "NOAA responses must fail fast on HTTP errors")
+    assert_true(
+        "response.status_code < 200 or response.status_code >= 300" in source,
+        "NOAA responses must explicitly reject redirects and other non-2xx statuses",
+    )
+    assert_true(
+        'raise ValueError("NOAA response must have a successful status")' in source,
+        "NOAA non-success status failures must be explicit",
+    )
+    request_function = RUNTIME_MODULE.read_text().split("def fetch_noaa_data", 1)[1].split(
+        "def noaa_resultset", 1
+    )[0]
+    assert_true(
+        request_function.index("response.status_code < 200 or response.status_code >= 300")
+        < request_function.index("payload = response.json()"),
+        "NOAA redirects and HTTP failures must be rejected before JSON parsing",
+    )
+    runtime_tests = RUNTIME_TESTS.read_text()
+    assert_true(
+        "test_fetch_rejects_redirect_before_parsing_json" in runtime_tests,
+        "runtime tests must cover redirect rejection before JSON parsing",
+    )
 
 
 def test_noaa_request_inputs_are_validated_before_network_use():
@@ -198,8 +241,8 @@ def test_noaa_requests_are_paginated_with_a_safety_bound():
             '"offset": next_offset',
             "all_results.extend(results)",
             "next_offset += len(results)",
-            "result_count = noaa_result_count(payload)",
-            "if len(all_results) == result_count:",
+            "resultset = noaa_resultset(payload)",
+            "if len(all_results) == expected_result_count:",
             "elif len(results) < NOAA_PAGE_LIMIT:",
             "return all_results",
             'raise ValueError("NOAA response exceeded the page safety limit")'):
@@ -222,6 +265,71 @@ def test_noaa_pagination_metadata_is_validated():
         'raise ValueError("NOAA pagination made no progress")',
     ):
         assert_true(contract in source, "missing NOAA metadata contract {0}".format(contract))
+
+
+def test_noaa_response_offsets_are_validated_before_accumulation():
+    source = RUNTIME_MODULE.read_text()
+    for contract in (
+            'offset = resultset.get("offset")',
+            "isinstance(offset, bool)",
+            "not isinstance(offset, int)",
+            "offset < 1",
+            'raise ValueError("NOAA response offset must be a positive integer")',
+            "response_offset is not None and response_offset != next_offset",
+            'raise ValueError("NOAA response offset does not match request")'):
+        assert_true(contract in source, "missing NOAA response-offset contract {0}".format(contract))
+
+    mismatch_guard = source.index(
+        "if response_offset is not None and response_offset != next_offset:"
+    )
+    accumulation = source.index("all_results.extend(results)")
+    assert_true(
+        mismatch_guard < accumulation,
+        "NOAA response offsets must be validated before page accumulation",
+    )
+
+
+def test_noaa_result_counts_remain_stable_across_pages():
+    source = project_source()
+    tests = RUNTIME_TESTS.read_text()
+    for contract in (
+        "expected_result_count = None",
+        "if result_count is not None:",
+        "if expected_result_count is None:",
+        "expected_result_count = result_count",
+        "elif result_count != expected_result_count:",
+        'raise ValueError("NOAA result count changed during pagination")',
+        "if expected_result_count is not None:",
+        "if len(all_results) > expected_result_count:",
+        "if len(all_results) == expected_result_count:",
+    ):
+        assert_true(contract in source, "missing stable NOAA result-count contract {0}".format(contract))
+
+    assert_true(
+        source.index("elif result_count != expected_result_count:")
+        < source.index("all_results.extend(results)"),
+        "NOAA result-count drift must fail before page accumulation",
+    )
+    for test_name in (
+        "test_fetch_rejects_result_count_drift_between_pages",
+        "test_fetch_uses_pinned_count_when_later_metadata_is_omitted",
+    ):
+        assert_true(
+            "def {0}(self):".format(test_name) in tests,
+            "runtime coverage is missing {0}".format(test_name),
+        )
+
+    docs = {
+        "README.md": "NOAA result counts must remain stable across paginated responses",
+        "SECURITY.md": "NOAA result-count changes fail before later pages are accumulated",
+        "VISION.md": "Reject NOAA result-count drift across paginated responses",
+        "CHANGES.md": "Rejected NOAA result-count drift across paginated responses",
+    }
+    for relative_path, phrase in docs.items():
+        assert_true(
+            phrase in (ROOT / relative_path).read_text(),
+            "{0} must document stable NOAA result counts".format(relative_path),
+        )
 
 
 def test_noaa_result_shape_is_checked():
@@ -249,8 +357,15 @@ def test_notebook_has_no_stale_outputs():
 
 def test_notebook_aligns_observations_by_date():
     source = project_source()
+    notebook = notebook_source(load_notebook())
     assert_true("weather_by_date = {}" in source, "notebook must collect NOAA observations by date")
     assert_true("def record_observation(item, weather_by_date):" in source, "notebook must centralize observation recording")
+    assert_true("def build_weather_rows(weather_by_date):" in source, "row construction must be importable")
+    assert_true(
+        "for date, values in sorted(weather_by_date.items()):" in source,
+        "row construction must preserve chronological date ordering",
+    )
+    assert_true("rows = build_weather_rows(weather_by_date)" in notebook, "notebook must use shared row construction")
     assert_true(".setdefault(date, {})" in source, "notebook must merge datatype values into a date bucket")
     assert_true(
         'pd.DataFrame(rows, columns=["date", "avgTemp", "minTemp", "maxTemp", "prcp"])' in source,
@@ -269,8 +384,58 @@ def test_notebook_rejects_non_text_observation_keys():
     assert_true(
         source.index("if not isinstance(date, str) or not isinstance(datatype, str):")
         < source.index("if not date or datatype not in SUPPORTED_DATATYPES:")
-        < source.index("weather_by_date.setdefault(date, {})[datatype]"),
+        < source.index("observations = weather_by_date.setdefault(date, {})"),
         "NOAA observation key type guard must run before set membership and bucketing",
+    )
+
+
+def test_conflicting_observations_fail_before_mutation():
+    source = RUNTIME_MODULE.read_text()
+    method = source.split("def record_observation", 1)[1].split(
+        "def parse_noaa_date", 1
+    )[0]
+    tests = RUNTIME_TESTS.read_text()
+    notebook = notebook_source(load_notebook())
+    vision = (ROOT / "VISION.md").read_text()
+    changes = (ROOT / "CHANGES.md").read_text()
+
+    required_source = (
+        'observations = weather_by_date.setdefault(date, {})',
+        'value = item.get("value")',
+        'if datatype in observations and observations[datatype] != value:',
+        'raise ValueError("Conflicting NOAA observation for date and datatype")',
+        'observations[datatype] = value',
+    )
+    for contract in required_source:
+        assert_true(
+            contract in method,
+            "duplicate observation guard must include {0}".format(contract),
+        )
+    assert_true(
+        method.index("if datatype in observations and observations[datatype] != value:")
+        < method.index('observations[datatype] = value'),
+        "duplicate observation conflicts must fail before mutation",
+    )
+    for test_name in (
+        "test_record_observation_accepts_identical_duplicate",
+        "test_record_observation_rejects_conflicting_duplicate_without_mutation",
+    ):
+        assert_true(
+            "def {0}(self):".format(test_name) in tests,
+            "duplicate observation tests must remain defined",
+        )
+    assert_true(
+        "from weather_notebook import build_weather_rows, fetch_noaa_data, record_observation"
+        in notebook,
+        "notebook must continue using the guarded observation helper",
+    )
+    assert_true(
+        "conflicting duplicate NOAA observations" in vision,
+        "VISION must preserve conflict rejection",
+    )
+    assert_true(
+        "conflicting duplicate NOAA observations" in changes,
+        "CHANGES must record conflict rejection",
     )
 
 
@@ -289,6 +454,10 @@ def test_notebook_guards_observation_dates_and_values():
     assert_true("if parsed_date is None:" in source, "row building must skip invalid NOAA dates")
     assert_true('"date": parsed_date' in source, "row building must use the guarded date value")
     assert_true("def noaa_number(value):" in source, "notebook must convert NOAA numeric values through a guard helper")
+    assert_true(
+        "isinstance(value, bool)" in source,
+        "NOAA numeric parsing must reject JSON booleans",
+    )
     assert_true("number = noaa_number(value)" in source, "unit conversion must use guarded numeric conversion")
     assert_true("import math" in source, "notebook must import math for finite numeric checks")
     assert_true(
@@ -300,7 +469,8 @@ def test_notebook_guards_observation_dates_and_values():
 
 
 def test_notebook_rejects_empty_valid_observation_rows():
-    source = notebook_source(load_notebook())
+    source = RUNTIME_MODULE.read_text()
+    notebook = notebook_source(load_notebook())
     assert_true(
         "if not rows:" in source,
         "notebook must detect when all NOAA observation rows were skipped",
@@ -310,16 +480,18 @@ def test_notebook_rejects_empty_valid_observation_rows():
         "empty NOAA observation sets must raise an explicit error",
     )
     assert_true(
-        source.index("if not rows:")
-        < source.index(
-            'pd.DataFrame(rows, columns=["date", "avgTemp", "minTemp", "maxTemp", "prcp"])'
-        ),
-        "notebook must reject empty row sets before dataframe construction",
+        source.index("if not rows:") < source.index("return rows"),
+        "row helper must reject empty row sets before returning",
+    )
+    assert_true(
+        notebook.index("rows = build_weather_rows(weather_by_date)")
+        < notebook.index('pd.DataFrame(rows, columns=["date", "avgTemp", "minTemp", "maxTemp", "prcp"])'),
+        "notebook must build validated rows before dataframe construction",
     )
 
 
 def test_notebook_skips_rows_without_measurements():
-    source = notebook_source(load_notebook())
+    source = RUNTIME_MODULE.read_text()
     assert_true(
         'avg_temp = c_to_f(values.get("TAVG"))' in source,
         "row building must store converted average temperature before append",
@@ -381,6 +553,117 @@ def test_completed_plans_are_in_docs_plans():
     assert_completed_plan(METRIC_UNITS_PLAN_PATH, "NOAA metric units")
     assert_completed_plan(REQUEST_INPUT_PLAN_PATH, "NOAA request input validation")
     assert_completed_plan(METADATA_PAGINATION_PLAN_PATH, "NOAA metadata pagination")
+    assert_completed_plan(RESPONSE_OFFSET_PLAN_PATH, "NOAA response offset validation")
+    assert_completed_plan(REDIRECT_BOUNDARY_PLAN_PATH, "NOAA token redirect boundary")
+    assert_completed_plan(MAKE_ROOT_PROTECTION_PLAN_PATH, "Make root override protection")
+    assert_completed_plan(SYNTHETIC_ANALYSIS_PLAN_PATH, "synthetic analysis flow")
+    assert_completed_plan(CONFLICTING_OBSERVATION_PLAN_PATH, "conflicting NOAA observations")
+    assert_completed_plan(ANALYSIS_PROVENANCE_PLAN_PATH, "weather analysis provenance")
+    assert_completed_plan(STABLE_RESULT_COUNT_PLAN_PATH, "stable NOAA result count")
+    checker_main = Path(__file__).read_text().rsplit("def main():", 1)[1]
+    assert_true(
+        "test_synthetic_analysis_flow_is_exercised," in checker_main,
+        "synthetic analysis-flow contract must run in the main suite",
+    )
+    assert_true(
+        "test_conflicting_observations_fail_before_mutation," in checker_main,
+        "conflicting observation contract must run in the main suite",
+    )
+    assert_true(
+        "test_noaa_result_counts_remain_stable_across_pages," in checker_main,
+        "stable NOAA result-count contract must run in the main suite",
+    )
+
+
+def test_synthetic_analysis_flow_is_exercised():
+    tests = RUNTIME_TESTS.read_text()
+    flow_test = tests.split(
+        "def test_synthetic_analysis_flow_builds_dataframe_and_plot(self):", 1
+    )[1].split("\n\nif __name__", 1)[0]
+    notebook = notebook_source(load_notebook())
+    vision = (ROOT / "VISION.md").read_text()
+    changes = (ROOT / "CHANGES.md").read_text()
+
+    assert_true(
+        "def test_synthetic_analysis_flow_builds_dataframe_and_plot(self):" in tests,
+        "synthetic analysis test must remain defined",
+    )
+    for contract in (
+        'matplotlib.use("Agg", force=True)',
+        "requests_get=fake_get",
+        "record_observation(item, weather_by_date)",
+        "build_weather_rows(weather_by_date)",
+        "pd.DataFrame(",
+        'dataframe.plot(kind="line", x="date", y="avgTemp")',
+        "plt.close(axes.figure)",
+    ):
+        assert_true(contract in flow_test, "synthetic analysis test must include {0}".format(contract))
+    assert_true(
+        "rows = build_weather_rows(weather_by_date)" in notebook,
+        "notebook must use the integration-tested row helper",
+    )
+    assert_true(
+        "Exercise the complete offline analysis flow" in vision,
+        "VISION must preserve synthetic analysis coverage",
+    )
+    assert_true(
+        "offline synthetic NOAA analysis-flow coverage" in changes,
+        "CHANGES must record synthetic analysis coverage",
+    )
+
+
+def test_analysis_provenance_is_visible_and_deterministic():
+    runtime = RUNTIME_MODULE.read_text()
+    tests = RUNTIME_TESTS.read_text()
+    notebook = notebook_source(load_notebook())
+    readme = " ".join((ROOT / "README.md").read_text().split())
+    security = " ".join((ROOT / "SECURITY.md").read_text().split())
+    vision = " ".join((ROOT / "VISION.md").read_text().split())
+    changes = " ".join((ROOT / "CHANGES.md").read_text().split())
+
+    for contract in (
+        "def format_analysis_provenance(",
+        "retrieved_at.astimezone(timezone.utc)",
+        'isoformat(timespec="seconds")',
+        '.replace("+00:00", "Z")',
+    ):
+        assert_true(contract in runtime, "runtime provenance helper must include {0}".format(contract))
+    for contract in (
+        "test_analysis_provenance_normalizes_station_range_and_utc_time",
+        "test_analysis_provenance_rejects_ambiguous_inputs",
+        'axes.set_title(weather_notebook.format_analysis_provenance(',
+        'axes.set_xlabel("Observation date")',
+        'axes.set_ylabel("Average temperature (degrees F)")',
+    ):
+        assert_true(contract in tests, "runtime provenance tests must include {0}".format(contract))
+    for contract in (
+        "from datetime import datetime, timezone",
+        "format_analysis_provenance",
+        "RETRIEVED_AT = datetime.now(timezone.utc)",
+        "axes.set_title(format_analysis_provenance(",
+        'axes.set_xlabel("Observation date")',
+        'axes.set_ylabel("Average temperature (degrees F)")',
+    ):
+        assert_true(contract in notebook, "notebook provenance flow must include {0}".format(contract))
+    assert_true(
+        notebook.index("record_observation(item, weather_by_date)") <
+        notebook.index("RETRIEVED_AT = datetime.now(timezone.utc)") <
+        notebook.index("rows = build_weather_rows(weather_by_date)"),
+        "retrieval completion time must be captured after NOAA collection and before plotting",
+    )
+    assert_true("repository's original sample selection" in readme,
+                "README must explain the station choice")
+    assert_true("keeps the analysis bounded and historical" in readme,
+                "README must explain the date-range choice")
+    assert_true("UTC retrieval completion time" in security, "SECURITY must preserve plot provenance")
+    assert_true("Include NOAA source, station, historical range" in vision,
+                "VISION must preserve generated plot provenance")
+    assert_true("deterministic provenance validation" in changes,
+                "CHANGES must record provenance validation")
+    assert_true("Document station and date-range choices" not in vision,
+                "completed station/date documentation must leave next priorities")
+    assert_true("Add data-source timestamps to generated outputs" not in vision,
+                "completed output timestamps must leave next priorities")
 
 
 def test_dependency_and_ci_contracts():
@@ -437,6 +720,10 @@ def test_dependency_and_ci_contracts():
                 locked_packages.get(name) == version,
                 "{0} must contain active direct pin {1}=={2}".format(lock_name, name, version),
             )
+        assert_true(
+            locked_packages.get("jupyter-server") == "2.20.0",
+            "{0} must contain the reviewed jupyter-server security pin".format(lock_name),
+        )
 
     workflow = CI_WORKFLOW_PATH.read_text()
     assert_true(workflow == EXPECTED_WORKFLOW, "CI workflow must match the fail-closed baseline")
@@ -444,10 +731,12 @@ def test_dependency_and_ci_contracts():
     assert_true(workflow_files == [CI_WORKFLOW_PATH], "check.yml must be the only workflow")
 
     makefile = (ROOT / "Makefile").read_text()
+    makefile_lines = set(makefile.splitlines())
     assert_true(
-        "ROOT := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))" in makefile,
-        "Makefile must resolve the repository from its own path",
+        "override ROOT := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))" in makefile_lines,
+        "Makefile must protect the repository resolved from its own path",
     )
+    assert_true("PYTHON ?= python3" in makefile_lines, "Makefile must preserve the Python command override")
     assert_true("$(ROOT)/scripts/check_weather_notebook_contracts.py" in makefile, "Makefile must use the rooted contract path")
     assert_true('find "$(ROOT)"' in makefile, "Makefile cleanup must stay inside the repository")
     assert_true('$(MAKE) -C "$(ROOT)" clean' in makefile, "recursive cleanup must stay rooted")
@@ -481,14 +770,19 @@ def main():
         test_noaa_metric_units_are_explicit_and_converted,
         test_noaa_requests_are_paginated_with_a_safety_bound,
         test_noaa_pagination_metadata_is_validated,
+        test_noaa_response_offsets_are_validated_before_accumulation,
+        test_noaa_result_counts_remain_stable_across_pages,
         test_noaa_result_shape_is_checked,
         test_notebook_has_no_stale_outputs,
         test_notebook_aligns_observations_by_date,
         test_notebook_rejects_non_text_observation_keys,
+        test_conflicting_observations_fail_before_mutation,
         test_notebook_guards_observation_dates_and_values,
         test_notebook_rejects_empty_valid_observation_rows,
         test_notebook_skips_rows_without_measurements,
         test_completed_plans_are_in_docs_plans,
+        test_synthetic_analysis_flow_is_exercised,
+        test_analysis_provenance_is_visible_and_deterministic,
         test_dependency_and_ci_contracts,
     ]
     for test in tests:

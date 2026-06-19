@@ -23,6 +23,7 @@ Priority:
 - Validate NOAA result shapes before converting observations
 - Fetch complete NOAA result pages within an explicit request safety bound
 - Validate returned NOAA page offsets before accumulating observations
+- Reject NOAA result-count drift across paginated responses
 - Reject conflicting duplicate NOAA observations before dataframe construction
 - Raise explicit errors for unexpected NOAA response roots
 - Reject non-text NOAA observation date and datatype keys before bucketing
@@ -35,12 +36,12 @@ Priority:
 - Keep the scientific environment exactly pinned and import-verified in CI
 - Exercise the complete offline analysis flow from synthetic NOAA responses
   through dataframe construction and a headless average-temperature plot
+- Include NOAA source, station, historical range, UTC retrieval completion
+  time, and display units in generated plot context
 
 Next priorities:
 
 - Add README setup notes and dependency requirements
-- Document station and date-range choices
-- Add data-source timestamps to generated outputs
 
 Contribution rules:
 

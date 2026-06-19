@@ -61,10 +61,16 @@ SYNTHETIC_ANALYSIS_PLAN_PATH = (
 CONFLICTING_OBSERVATION_PLAN_PATH = (
     ROOT / "docs" / "plans" / "2026-06-16-conflicting-noaa-observations.md"
 )
+ANALYSIS_PROVENANCE_PLAN_PATH = (
+    ROOT / "docs" / "plans" / "2026-06-16-weather-analysis-provenance.md"
+)
+STABLE_RESULT_COUNT_PLAN_PATH = (
+    ROOT / "docs" / "plans" / "2026-06-16-stable-noaa-result-count.md"
+)
 CI_WORKFLOW_PATH = ROOT / ".github" / "workflows" / "check.yml"
 LOCKFILE_SHA256 = {
-    "requirements-py312.lock": "47835a6609db0175be86dd3054e5e2334668b35cf0d0d59e45208ef2fc716179",
-    "requirements-py314.lock": "e82f04e40657676dfd0bb057f9158935acb594c053366e91d2f427a5db066b12",
+    "requirements-py312.lock": "552696e4d187043dac40208e56287c27994016e696b27adca9616ad463167e0a",
+    "requirements-py314.lock": "bd4805956fb10e570cc02bc32c4021caef6c553f12a167359fff7e72656165d1",
 }
 
 EXPECTED_WORKFLOW = """name: Check
@@ -153,11 +159,19 @@ def test_noaa_requests_are_parameterized_and_bounded():
     assert_true("timeout=REQUEST_TIMEOUT_SECONDS" in source, "NOAA requests must set a timeout")
     assert_true("allow_redirects=False" in source, "NOAA token requests must not follow redirects")
     assert_true(".raise_for_status()" in source, "NOAA responses must fail fast on HTTP errors")
+    assert_true(
+        "response.status_code < 200 or response.status_code >= 300" in source,
+        "NOAA responses must explicitly reject redirects and other non-2xx statuses",
+    )
+    assert_true(
+        'raise ValueError("NOAA response must have a successful status")' in source,
+        "NOAA non-success status failures must be explicit",
+    )
     request_function = RUNTIME_MODULE.read_text().split("def fetch_noaa_data", 1)[1].split(
         "def noaa_resultset", 1
     )[0]
     assert_true(
-        request_function.index("response.raise_for_status()")
+        request_function.index("response.status_code < 200 or response.status_code >= 300")
         < request_function.index("payload = response.json()"),
         "NOAA redirects and HTTP failures must be rejected before JSON parsing",
     )
@@ -228,7 +242,7 @@ def test_noaa_requests_are_paginated_with_a_safety_bound():
             "all_results.extend(results)",
             "next_offset += len(results)",
             "resultset = noaa_resultset(payload)",
-            "if len(all_results) == result_count:",
+            "if len(all_results) == expected_result_count:",
             "elif len(results) < NOAA_PAGE_LIMIT:",
             "return all_results",
             'raise ValueError("NOAA response exceeded the page safety limit")'):
@@ -273,6 +287,49 @@ def test_noaa_response_offsets_are_validated_before_accumulation():
         mismatch_guard < accumulation,
         "NOAA response offsets must be validated before page accumulation",
     )
+
+
+def test_noaa_result_counts_remain_stable_across_pages():
+    source = project_source()
+    tests = RUNTIME_TESTS.read_text()
+    for contract in (
+        "expected_result_count = None",
+        "if result_count is not None:",
+        "if expected_result_count is None:",
+        "expected_result_count = result_count",
+        "elif result_count != expected_result_count:",
+        'raise ValueError("NOAA result count changed during pagination")',
+        "if expected_result_count is not None:",
+        "if len(all_results) > expected_result_count:",
+        "if len(all_results) == expected_result_count:",
+    ):
+        assert_true(contract in source, "missing stable NOAA result-count contract {0}".format(contract))
+
+    assert_true(
+        source.index("elif result_count != expected_result_count:")
+        < source.index("all_results.extend(results)"),
+        "NOAA result-count drift must fail before page accumulation",
+    )
+    for test_name in (
+        "test_fetch_rejects_result_count_drift_between_pages",
+        "test_fetch_uses_pinned_count_when_later_metadata_is_omitted",
+    ):
+        assert_true(
+            "def {0}(self):".format(test_name) in tests,
+            "runtime coverage is missing {0}".format(test_name),
+        )
+
+    docs = {
+        "README.md": "NOAA result counts must remain stable across paginated responses",
+        "SECURITY.md": "NOAA result-count changes fail before later pages are accumulated",
+        "VISION.md": "Reject NOAA result-count drift across paginated responses",
+        "CHANGES.md": "Rejected NOAA result-count drift across paginated responses",
+    }
+    for relative_path, phrase in docs.items():
+        assert_true(
+            phrase in (ROOT / relative_path).read_text(),
+            "{0} must document stable NOAA result counts".format(relative_path),
+        )
 
 
 def test_noaa_result_shape_is_checked():
@@ -397,6 +454,10 @@ def test_notebook_guards_observation_dates_and_values():
     assert_true("if parsed_date is None:" in source, "row building must skip invalid NOAA dates")
     assert_true('"date": parsed_date' in source, "row building must use the guarded date value")
     assert_true("def noaa_number(value):" in source, "notebook must convert NOAA numeric values through a guard helper")
+    assert_true(
+        "isinstance(value, bool)" in source,
+        "NOAA numeric parsing must reject JSON booleans",
+    )
     assert_true("number = noaa_number(value)" in source, "unit conversion must use guarded numeric conversion")
     assert_true("import math" in source, "notebook must import math for finite numeric checks")
     assert_true(
@@ -497,6 +558,8 @@ def test_completed_plans_are_in_docs_plans():
     assert_completed_plan(MAKE_ROOT_PROTECTION_PLAN_PATH, "Make root override protection")
     assert_completed_plan(SYNTHETIC_ANALYSIS_PLAN_PATH, "synthetic analysis flow")
     assert_completed_plan(CONFLICTING_OBSERVATION_PLAN_PATH, "conflicting NOAA observations")
+    assert_completed_plan(ANALYSIS_PROVENANCE_PLAN_PATH, "weather analysis provenance")
+    assert_completed_plan(STABLE_RESULT_COUNT_PLAN_PATH, "stable NOAA result count")
     checker_main = Path(__file__).read_text().rsplit("def main():", 1)[1]
     assert_true(
         "test_synthetic_analysis_flow_is_exercised," in checker_main,
@@ -505,6 +568,10 @@ def test_completed_plans_are_in_docs_plans():
     assert_true(
         "test_conflicting_observations_fail_before_mutation," in checker_main,
         "conflicting observation contract must run in the main suite",
+    )
+    assert_true(
+        "test_noaa_result_counts_remain_stable_across_pages," in checker_main,
+        "stable NOAA result-count contract must run in the main suite",
     )
 
 
@@ -543,6 +610,60 @@ def test_synthetic_analysis_flow_is_exercised():
         "offline synthetic NOAA analysis-flow coverage" in changes,
         "CHANGES must record synthetic analysis coverage",
     )
+
+
+def test_analysis_provenance_is_visible_and_deterministic():
+    runtime = RUNTIME_MODULE.read_text()
+    tests = RUNTIME_TESTS.read_text()
+    notebook = notebook_source(load_notebook())
+    readme = " ".join((ROOT / "README.md").read_text().split())
+    security = " ".join((ROOT / "SECURITY.md").read_text().split())
+    vision = " ".join((ROOT / "VISION.md").read_text().split())
+    changes = " ".join((ROOT / "CHANGES.md").read_text().split())
+
+    for contract in (
+        "def format_analysis_provenance(",
+        "retrieved_at.astimezone(timezone.utc)",
+        'isoformat(timespec="seconds")',
+        '.replace("+00:00", "Z")',
+    ):
+        assert_true(contract in runtime, "runtime provenance helper must include {0}".format(contract))
+    for contract in (
+        "test_analysis_provenance_normalizes_station_range_and_utc_time",
+        "test_analysis_provenance_rejects_ambiguous_inputs",
+        'axes.set_title(weather_notebook.format_analysis_provenance(',
+        'axes.set_xlabel("Observation date")',
+        'axes.set_ylabel("Average temperature (degrees F)")',
+    ):
+        assert_true(contract in tests, "runtime provenance tests must include {0}".format(contract))
+    for contract in (
+        "from datetime import datetime, timezone",
+        "format_analysis_provenance",
+        "RETRIEVED_AT = datetime.now(timezone.utc)",
+        "axes.set_title(format_analysis_provenance(",
+        'axes.set_xlabel("Observation date")',
+        'axes.set_ylabel("Average temperature (degrees F)")',
+    ):
+        assert_true(contract in notebook, "notebook provenance flow must include {0}".format(contract))
+    assert_true(
+        notebook.index("record_observation(item, weather_by_date)") <
+        notebook.index("RETRIEVED_AT = datetime.now(timezone.utc)") <
+        notebook.index("rows = build_weather_rows(weather_by_date)"),
+        "retrieval completion time must be captured after NOAA collection and before plotting",
+    )
+    assert_true("repository's original sample selection" in readme,
+                "README must explain the station choice")
+    assert_true("keeps the analysis bounded and historical" in readme,
+                "README must explain the date-range choice")
+    assert_true("UTC retrieval completion time" in security, "SECURITY must preserve plot provenance")
+    assert_true("Include NOAA source, station, historical range" in vision,
+                "VISION must preserve generated plot provenance")
+    assert_true("deterministic provenance validation" in changes,
+                "CHANGES must record provenance validation")
+    assert_true("Document station and date-range choices" not in vision,
+                "completed station/date documentation must leave next priorities")
+    assert_true("Add data-source timestamps to generated outputs" not in vision,
+                "completed output timestamps must leave next priorities")
 
 
 def test_dependency_and_ci_contracts():
@@ -599,6 +720,10 @@ def test_dependency_and_ci_contracts():
                 locked_packages.get(name) == version,
                 "{0} must contain active direct pin {1}=={2}".format(lock_name, name, version),
             )
+        assert_true(
+            locked_packages.get("jupyter-server") == "2.20.0",
+            "{0} must contain the reviewed jupyter-server security pin".format(lock_name),
+        )
 
     workflow = CI_WORKFLOW_PATH.read_text()
     assert_true(workflow == EXPECTED_WORKFLOW, "CI workflow must match the fail-closed baseline")
@@ -646,6 +771,7 @@ def main():
         test_noaa_requests_are_paginated_with_a_safety_bound,
         test_noaa_pagination_metadata_is_validated,
         test_noaa_response_offsets_are_validated_before_accumulation,
+        test_noaa_result_counts_remain_stable_across_pages,
         test_noaa_result_shape_is_checked,
         test_notebook_has_no_stale_outputs,
         test_notebook_aligns_observations_by_date,
@@ -656,6 +782,7 @@ def main():
         test_notebook_skips_rows_without_measurements,
         test_completed_plans_are_in_docs_plans,
         test_synthetic_analysis_flow_is_exercised,
+        test_analysis_provenance_is_visible_and_deterministic,
         test_dependency_and_ci_contracts,
     ]
     for test in tests:

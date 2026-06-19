@@ -44,12 +44,18 @@ The setup commands above are derived from repository files. Legacy mobile, Pytho
 
 - Run `jupyter notebook Weather.ipynb` after installing dependencies and setting `NOAA_TOKEN`.
 - The notebook fetches NOAA CDO observations for station `GHCND:US1CAMR0037` across the configured date range.
+- The station is the repository's original sample selection, and the fixed
+  2019 range keeps the analysis bounded and historical. Neither is claimed as
+  a representative climate series or current-weather source.
 - NOAA requests explicitly use metric units; Celsius temperatures and
   millimeter precipitation are converted for Fahrenheit/inch presentation.
 - Token-bearing NOAA requests do not follow redirects, keeping credentials on
   the configured Climate Data Online API origin.
 - NOAA result sets are fetched in 1,000-row pages with a 20-page safety limit
   per request group; exhausting the limit raises instead of silently truncating.
+- The average-temperature plot identifies NOAA CDO, the station, inclusive
+  observation range, UTC retrieval completion time, and Fahrenheit display
+  units so exported screenshots retain their analysis context.
 
 ## Testing and Verification
 
@@ -71,7 +77,8 @@ The setup commands above are derived from repository files. Legacy mobile, Pytho
 - `python3 -m unittest weather_notebook_tests` runs the executable NOAA helper
   tests plus an offline synthetic flow through fake responses, date bucketing,
   converted pandas rows, and a headless matplotlib line plot without a token or
-  network request.
+  network request. The synthetic plot also verifies deterministic provenance
+  title and axis labels.
 - `make lock` regenerates reviewed Python 3.12 and 3.14 Linux lockfiles with
   SHA-256 hashes from the five direct pins in `requirements.txt`.
 - Hosted installs use pip `--require-hashes` against the matrix-matched lock;
@@ -87,6 +94,8 @@ When the required SDK or runtime is unavailable, use static checks and source re
   your local environment and out of git; blank or whitespace-only values are
   rejected before requests are made. The reusable fetch helper also rejects
   invalid years, datatypes, and station identifiers before network use.
+- NOAA result counts must remain stable across paginated responses; count drift
+  fails before a later page can alter the accumulated analysis.
 - Do not commit NOAA API tokens, private datasets, or refreshed outputs without source dates.
 
 ## Security and Privacy Notes
@@ -134,6 +143,10 @@ When the required SDK or runtime is unavailable, use static checks and source re
   NOAA token on the configured API origin.
 - See `docs/plans/2026-06-14-synthetic-analysis-flow.md` for deterministic
   offline dataframe and plotting coverage.
+- See `docs/plans/2026-06-16-weather-analysis-provenance.md` for station,
+  historical range, UTC retrieval-time, and display-unit plot context.
+- See `docs/plans/2026-06-16-stable-noaa-result-count.md` for fail-closed
+  pagination count consistency.
 
 ## Contributing
 

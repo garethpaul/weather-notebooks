@@ -5,9 +5,10 @@ import weather_notebook
 
 
 class FakeResponse:
-    def __init__(self, payload, error=None):
+    def __init__(self, payload, error=None, status_code=200):
         self.payload = payload
         self.error = error
+        self.status_code = status_code
         self.json_calls = 0
 
     def raise_for_status(self):
@@ -187,6 +188,49 @@ class WeatherNotebookTest(unittest.TestCase):
         self.assertEqual(results, [{"id": 1}, {"id": 2}, {"id": 3}])
         self.assertEqual(calls, [1, 3])
 
+    def test_fetch_rejects_result_count_drift_between_pages(self):
+        for later_count in (2, 4):
+            with self.subTest(later_count=later_count):
+                calls = []
+                pages = [[{"id": 1}, {"id": 2}], [{"id": 3}]]
+
+                def fake_get(url, headers, params, timeout, allow_redirects):
+                    page_index = len(calls)
+                    calls.append(params["offset"])
+                    return FakeResponse({
+                        "results": pages[page_index],
+                        "metadata": {"resultset": {
+                            "count": 3 if page_index == 0 else later_count,
+                            "offset": calls[-1],
+                        }},
+                    })
+
+                with self.assertRaisesRegex(ValueError, "result count changed"):
+                    weather_notebook.fetch_noaa_data(
+                        2019, ["TAVG"], "token", "station", requests_get=fake_get
+                    )
+
+                self.assertEqual(calls, [1, 3])
+
+    def test_fetch_uses_pinned_count_when_later_metadata_is_omitted(self):
+        calls = []
+        pages = [[{"id": 1}, {"id": 2}], [{"id": 3}]]
+
+        def fake_get(url, headers, params, timeout, allow_redirects):
+            page_index = len(calls)
+            calls.append(params["offset"])
+            payload = {"results": pages[page_index]}
+            if page_index == 0:
+                payload["metadata"] = {"resultset": {"count": 3, "offset": 1}}
+            return FakeResponse(payload)
+
+        results = weather_notebook.fetch_noaa_data(
+            2019, ["TAVG"], "token", "station", requests_get=fake_get
+        )
+
+        self.assertEqual(results, [{"id": 1}, {"id": 2}, {"id": 3}])
+        self.assertEqual(calls, [1, 3])
+
     def test_fetch_rejects_mismatched_response_offset_before_next_request(self):
         calls = []
 
@@ -275,14 +319,14 @@ class WeatherNotebookTest(unittest.TestCase):
     def test_fetch_rejects_redirect_before_parsing_json(self):
         response = FakeResponse(
             {"results": [{"must": "not be parsed"}]},
-            RuntimeError("redirect rejected"),
+            status_code=302,
         )
 
         def fake_get(url, headers, params, timeout, allow_redirects):
             self.assertFalse(allow_redirects)
             return response
 
-        with self.assertRaisesRegex(RuntimeError, "redirect rejected"):
+        with self.assertRaisesRegex(ValueError, "successful status"):
             weather_notebook.fetch_noaa_data(
                 2019, ["PRCP"], "token", "station", requests_get=fake_get
             )
@@ -410,6 +454,23 @@ class WeatherNotebookTest(unittest.TestCase):
         self.assertEqual(rows[0]["maxTemp"], 50.0)
         self.assertEqual(rows[1]["avgTemp"], 68.0)
         self.assertEqual(rows[1]["prcp"], 1.0)
+
+    def test_build_weather_rows_treats_boolean_measurements_as_missing(self):
+        rows = weather_notebook.build_weather_rows({
+            "2019-01-01T00:00:00": {"TAVG": True},
+            "2019-01-02T00:00:00": {"TAVG": 20},
+        })
+
+        self.assertEqual(
+            rows,
+            [{
+                "date": datetime(2019, 1, 2),
+                "avgTemp": 68.0,
+                "minTemp": None,
+                "maxTemp": None,
+                "prcp": None,
+            }],
+        )
 
     def test_build_weather_rows_rejects_empty_analysis(self):
         with self.assertRaisesRegex(ValueError, "No valid NOAA observations"):

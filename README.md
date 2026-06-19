@@ -94,6 +94,8 @@ When the required SDK or runtime is unavailable, use static checks and source re
   your local environment and out of git; blank or whitespace-only values are
   rejected before requests are made. The reusable fetch helper also rejects
   invalid years, datatypes, and station identifiers before network use.
+- NOAA result counts must remain stable across paginated responses; count drift
+  fails before a later page can alter the accumulated analysis.
 - Do not commit NOAA API tokens, private datasets, or refreshed outputs without source dates.
 
 ## Security and Privacy Notes
@@ -143,6 +145,8 @@ When the required SDK or runtime is unavailable, use static checks and source re
   offline dataframe and plotting coverage.
 - See `docs/plans/2026-06-16-weather-analysis-provenance.md` for station,
   historical range, UTC retrieval-time, and display-unit plot context.
+- See `docs/plans/2026-06-16-stable-noaa-result-count.md` for fail-closed
+  pagination count consistency.
 
 ## Contributing
 

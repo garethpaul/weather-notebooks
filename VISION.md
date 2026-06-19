@@ -16,32 +16,40 @@ Priority:
 
 - Preserve the notebook analysis flow
 - Keep NOAA tokens as local user-provided values
+- Keep NOAA tokens on the configured API origin by rejecting redirects
 - Reject blank or whitespace-only NOAA token values before requests
 - Make station ID, date range, and unit conversions visible
 - Request explicit NOAA metric scaling before display-unit conversion
 - Validate NOAA result shapes before converting observations
 - Fetch complete NOAA result pages within an explicit request safety bound
+- Validate returned NOAA page offsets before accumulating observations
+- Reject NOAA result-count drift across paginated responses
+- Reject conflicting duplicate NOAA observations before dataframe construction
 - Raise explicit errors for unexpected NOAA response roots
 - Reject non-text NOAA observation date and datatype keys before bucketing
 - Guard malformed NOAA dates and numeric values before building rows
 - Reject NaN and infinite NOAA numeric values before plotting
 - Reject empty parsed observation sets before plotting
 - Skip date-valid rows that have no usable converted measurements
+- Keep GitHub Actions running the offline `make check` baseline before review
 - Avoid presenting historical data as current conditions
 - Keep the scientific environment exactly pinned and import-verified in CI
+- Exercise the complete offline analysis flow from synthetic NOAA responses
+  through dataframe construction and a headless average-temperature plot
+- Include NOAA source, station, historical range, UTC retrieval completion
+  time, and display units in generated plot context
 
 Next priorities:
 
 - Add README setup notes and dependency requirements
-- Document station and date-range choices
-- Extract NOAA fetching into a testable Python module
-- Add data-source timestamps to generated outputs
 
 Contribution rules:
 
 - One PR = one focused data source, notebook, visualization, dependency, or documentation change.
 - Do not commit API tokens or private datasets.
 - Keep dataset refreshes sourced and dated.
+- Keep `.github/workflows/check.yml` aligned with the offline notebook contract
+  baseline.
 - Preserve unit conversion notes.
 
 ## Security And Responsible Use

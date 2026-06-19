@@ -34,7 +34,7 @@ Additional scan context:
 ```bash
 git clone https://github.com/garethpaul/weather-notebooks.git
 cd weather-notebooks
-python -m pip install -r requirements.txt
+python -m pip install --require-hashes -r requirements-py312.lock
 export NOAA_TOKEN=your-noaa-token
 ```
 
@@ -44,22 +44,45 @@ The setup commands above are derived from repository files. Legacy mobile, Pytho
 
 - Run `jupyter notebook Weather.ipynb` after installing dependencies and setting `NOAA_TOKEN`.
 - The notebook fetches NOAA CDO observations for station `GHCND:US1CAMR0037` across the configured date range.
+- The station is the repository's original sample selection, and the fixed
+  2019 range keeps the analysis bounded and historical. Neither is claimed as
+  a representative climate series or current-weather source.
 - NOAA requests explicitly use metric units; Celsius temperatures and
   millimeter precipitation are converted for Fahrenheit/inch presentation.
+- Token-bearing NOAA requests do not follow redirects, keeping credentials on
+  the configured Climate Data Online API origin.
 - NOAA result sets are fetched in 1,000-row pages with a 20-page safety limit
   per request group; exhausting the limit raises instead of silently truncating.
+- The average-temperature plot identifies NOAA CDO, the station, inclusive
+  observation range, UTC retrieval completion time, and Fahrenheit display
+  units so exported screenshots retain their analysis context.
 
 ## Testing and Verification
 
 - `make verify` runs static notebook reproducibility, token-safety, date
   alignment, NOAA root/result-shape, observation key, finite numeric value,
   observation value-guard, token whitespace, metric-unit conversion,
-  pagination, measurement-row, and empty-row checks.
+  pagination, response-offset validation, redirect-boundary, measurement-row,
+  and empty-row
+  checks. It also runs executable
+  fake-HTTP tests for pagination, payload validation, failure propagation,
+  request bounds, and unit conversions.
 - `make check` runs `make verify` with bytecode cleanup before and after.
 - GitHub Actions installs the exact scientific stack and runs offline contracts
-  on Python 3.12 and 3.14 on Ubuntu 24.04 with read-only permissions, immutable
-  action pins, and cancellation for superseded runs.
+  on every push, pull request, and manual dispatch for Python 3.12 and 3.14 on
+  Ubuntu 24.04 with read-only permissions, immutable action pins,
+  credential-free checkout, and cancellation for superseded runs.
+- The hosted matrix also reruns `make check` from an external working directory.
 - `python3 scripts/check_weather_notebook_contracts.py` runs just the notebook contracts.
+- `python3 -m unittest weather_notebook_tests` runs the executable NOAA helper
+  tests plus an offline synthetic flow through fake responses, date bucketing,
+  converted pandas rows, and a headless matplotlib line plot without a token or
+  network request. The synthetic plot also verifies deterministic provenance
+  title and axis labels.
+- `make lock` regenerates reviewed Python 3.12 and 3.14 Linux lockfiles with
+  SHA-256 hashes from the five direct pins in `requirements.txt`.
+- Hosted installs use pip `--require-hashes` against the matrix-matched lock;
+  the current 106-package graph returned no findings from the official OSV API.
 - Completed maintenance plans live under `docs/plans` and are checked by
   `make check`.
 
@@ -69,7 +92,10 @@ When the required SDK or runtime is unavailable, use static checks and source re
 
 - `NOAA_TOKEN` is required to fetch NOAA Climate Data Online data. Keep it in
   your local environment and out of git; blank or whitespace-only values are
-  rejected before requests are made.
+  rejected before requests are made. The reusable fetch helper also rejects
+  invalid years, datatypes, and station identifiers before network use.
+- NOAA result counts must remain stable across paginated responses; count drift
+  fails before a later page can alter the accumulated analysis.
 - Do not commit NOAA API tokens, private datasets, or refreshed outputs without source dates.
 
 ## Security and Privacy Notes
@@ -100,12 +126,27 @@ When the required SDK or runtime is unavailable, use static checks and source re
   rejecting non-text NOAA observation date and datatype keys before bucketing.
 - See `docs/plans/2026-06-09-weather-notebook-token-whitespace.md` for
   trimming and rejecting blank NOAA token environment values before requests.
+- See `docs/plans/2026-06-10-ci-baseline.md` for the GitHub Actions baseline.
 - See `docs/plans/2026-06-10-dependency-reproducibility.md` for exact scientific
   stack pins and hosted import verification.
 - See `docs/plans/2026-06-10-noaa-pagination.md` for bounded NOAA result
   pagination and explicit safety-limit failure.
 - See `docs/plans/2026-06-10-noaa-metric-units.md` for explicit NOAA unit
   scaling and corrected display conversions.
+- See `docs/plans/2026-06-12-noaa-request-input-validation.md` for fail-fast
+  validation and normalization at the reusable NOAA request boundary.
+- See `docs/plans/2026-06-13-noaa-metadata-pagination.md` for result-count-aware
+  NOAA pagination and record-based offset advancement.
+- See `docs/plans/2026-06-13-noaa-response-offset-validation.md` for validating
+  optional response offsets before accumulating NOAA pages.
+- See `docs/plans/2026-06-13-noaa-token-redirect-boundary.md` for keeping the
+  NOAA token on the configured API origin.
+- See `docs/plans/2026-06-14-synthetic-analysis-flow.md` for deterministic
+  offline dataframe and plotting coverage.
+- See `docs/plans/2026-06-16-weather-analysis-provenance.md` for station,
+  historical range, UTC retrieval-time, and display-unit plot context.
+- See `docs/plans/2026-06-16-stable-noaa-result-count.md` for fail-closed
+  pagination count consistency.
 
 ## Contributing
 

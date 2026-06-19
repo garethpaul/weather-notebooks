@@ -45,6 +45,12 @@ NOAA result pagination is capped at 20,000 rows per request group so an
 unexpected upstream response cannot cause unbounded API calls or accumulation.
 When NOAA returns pagination metadata, its response offset must match the
 requested record before page results are accumulated.
+Token-bearing NOAA requests must not follow redirects; redirect responses are
+rejected before response bodies are parsed so the provider-specific `token`
+header stays on the configured API origin.
+Generated analysis plots should retain NOAA source, station, observation range,
+UTC retrieval completion time, and display units. This context reduces the risk
+that a historical sample is redistributed as current or representative data.
 
 ## Dependency and Supply Chain Security
 
@@ -63,3 +69,5 @@ Good-faith research is welcome when it stays within these boundaries:
 ## Maintainer Response
 
 The maintainer will review complete reports as availability allows, prioritize issues by exploitability and impact, and coordinate a fix or mitigation when the affected code is still maintained. For sample, archived, or educational repositories, the likely remediation may be documentation, dependency updates, or clearly marking unsupported code rather than a production-style patch release.
+NOAA result-count changes fail before later pages are accumulated, preventing
+one analysis from silently combining inconsistent pagination snapshots.

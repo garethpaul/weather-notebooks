@@ -1,5 +1,5 @@
 import math
-from datetime import datetime
+from datetime import datetime, timezone
 
 import requests
 
@@ -9,6 +9,33 @@ REQUEST_TIMEOUT_SECONDS = 10
 NOAA_PAGE_LIMIT = 1000
 MAX_NOAA_PAGES = 20
 SUPPORTED_DATATYPES = {"TAVG", "TMIN", "TMAX", "PRCP"}
+
+
+def format_analysis_provenance(station_id, start_year, end_year_exclusive, retrieved_at):
+    if not isinstance(station_id, str) or not station_id.strip():
+        raise ValueError("station_id must be nonblank text")
+    if (
+            isinstance(start_year, bool) or not isinstance(start_year, int) or
+            isinstance(end_year_exclusive, bool) or not isinstance(end_year_exclusive, int) or
+            start_year < 1000 or end_year_exclusive > 9999 or
+            start_year >= end_year_exclusive):
+        raise ValueError("analysis years must define a valid four-digit range")
+    if not isinstance(retrieved_at, datetime):
+        raise ValueError("retrieved_at must be a datetime")
+    if retrieved_at.tzinfo is None or retrieved_at.utcoffset() is None:
+        raise ValueError("retrieved_at must include a timezone")
+
+    retrieved_utc = retrieved_at.astimezone(timezone.utc)
+    retrieved_text = retrieved_utc.isoformat(timespec="seconds").replace("+00:00", "Z")
+    return (
+        "NOAA CDO {0} | {1}-01-01 to {2}-12-31 | retrieved {3}"
+        .format(
+            station_id.strip(),
+            start_year,
+            end_year_exclusive - 1,
+            retrieved_text,
+        )
+    )
 
 
 def fetch_noaa_data(year, datatype_ids, token, station_id, requests_get=None):
@@ -29,6 +56,7 @@ def fetch_noaa_data(year, datatype_ids, token, station_id, requests_get=None):
     station_id = station_id.strip()
     all_results = []
     next_offset = 1
+    expected_result_count = None
     for _page_index in range(MAX_NOAA_PAGES):
         params = {
             "datasetid": "GHCND",
@@ -48,6 +76,8 @@ def fetch_noaa_data(year, datatype_ids, token, station_id, requests_get=None):
             allow_redirects=False,
         )
         response.raise_for_status()
+        if response.status_code < 200 or response.status_code >= 300:
+            raise ValueError("NOAA response must have a successful status")
         payload = response.json()
         if not isinstance(payload, dict):
             raise ValueError("NOAA response must be an object")
@@ -58,12 +88,17 @@ def fetch_noaa_data(year, datatype_ids, token, station_id, requests_get=None):
         result_count, response_offset = resultset or (None, None)
         if response_offset is not None and response_offset != next_offset:
             raise ValueError("NOAA response offset does not match request")
+        if result_count is not None:
+            if expected_result_count is None:
+                expected_result_count = result_count
+            elif result_count != expected_result_count:
+                raise ValueError("NOAA result count changed during pagination")
         all_results.extend(results)
         next_offset += len(results)
-        if result_count is not None:
-            if len(all_results) > result_count:
+        if expected_result_count is not None:
+            if len(all_results) > expected_result_count:
                 raise ValueError("NOAA result count is inconsistent")
-            if len(all_results) == result_count:
+            if len(all_results) == expected_result_count:
                 return all_results
             if not results:
                 raise ValueError("NOAA pagination made no progress")
@@ -100,7 +135,11 @@ def record_observation(item, weather_by_date):
         return
     if not date or datatype not in SUPPORTED_DATATYPES:
         return
-    weather_by_date.setdefault(date, {})[datatype] = item.get("value")
+    observations = weather_by_date.setdefault(date, {})
+    value = item.get("value")
+    if datatype in observations and observations[datatype] != value:
+        raise ValueError("Conflicting NOAA observation for date and datatype")
+    observations[datatype] = value
 
 
 def parse_noaa_date(value):
@@ -111,7 +150,7 @@ def parse_noaa_date(value):
 
 
 def noaa_number(value):
-    if value is None:
+    if value is None or isinstance(value, bool):
         return None
     try:
         number = float(value)
@@ -134,3 +173,28 @@ def mm_to_inches(value):
     if number is None:
         return None
     return number / 25.4
+
+
+def build_weather_rows(weather_by_date):
+    rows = []
+    for date, values in sorted(weather_by_date.items()):
+        parsed_date = parse_noaa_date(date)
+        if parsed_date is None:
+            continue
+        avg_temp = c_to_f(values.get("TAVG"))
+        min_temp = c_to_f(values.get("TMIN"))
+        max_temp = c_to_f(values.get("TMAX"))
+        precipitation = mm_to_inches(values.get("PRCP"))
+        if all(value is None for value in (avg_temp, min_temp, max_temp, precipitation)):
+            continue
+        rows.append({
+            "date": parsed_date,
+            "avgTemp": avg_temp,
+            "minTemp": min_temp,
+            "maxTemp": max_temp,
+            "prcp": precipitation,
+        })
+
+    if not rows:
+        raise ValueError("No valid NOAA observations were available")
+    return rows

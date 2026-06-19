@@ -38,15 +38,17 @@ Primary references:
 ## Implementation
 
 1. Pass `allow_redirects=False` to the injected request function.
-2. Keep `raise_for_status()` before `response.json()` so 3xx responses fail
-   without payload processing.
+2. Keep `raise_for_status()` for 4xx/5xx responses and explicitly require a
+   2xx status before `response.json()`, because Requests does not raise for
+   3xx responses.
 3. Extend runtime fakes, offline contracts, maintenance documentation, and
    hostile mutations without adding dependencies or making a live NOAA call.
 
 ## Verification
 
-- Four focused runtime tests passed for redirect disabling, normalized request
-  options, HTTP failure propagation, and fail-before-JSON ordering.
+- Focused runtime tests cover redirect disabling, normalized request options,
+  HTTP failure propagation, real 3xx status handling, and fail-before-JSON
+  ordering.
 - All 17 executable helper tests passed.
 - Four hostile mutations covering option removal, redirect re-enablement,
   reversed status/JSON ordering, and missing runtime coverage were rejected.

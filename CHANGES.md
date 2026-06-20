@@ -1,5 +1,12 @@
 # Changes
 
+## 2026-06-20
+
+- Updated both hashed Python lockfiles to `jupyterlab` 4.5.9 to remediate
+  GHSA-vmhf-c436-hxj4 while preserving the existing direct dependency set.
+- Added a fail-closed contract for the reviewed transitive security pin and
+  refreshed both lockfile integrity digests.
+
 ## 2026-06-18
 
 - Explicitly rejected NOAA 3xx responses before parsing JSON; Requests does

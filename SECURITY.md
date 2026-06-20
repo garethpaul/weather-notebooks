@@ -56,6 +56,11 @@ that a historical sample is redistributed as current or representative data.
 
 Dependency updates should come from trusted package managers and should keep lockfiles in sync when lockfiles exist. Do not commit credentials, private keys, tokens, generated secrets, or machine-local configuration. If a vulnerability depends on a compromised package, typosquatting risk, insecure transitive dependency, or unsafe build step, include the package name, affected version, and the path through which it is used.
 
+The reviewed Python 3.12 and 3.14 lockfiles require JupyterLab 4.5.9 or later
+within the current 4.5 release line. Earlier releases are affected by
+GHSA-vmhf-c436-hxj4, a stored cross-site scripting issue in extension package
+metadata handling.
+
 ## Safe Research Guidelines
 
 Good-faith research is welcome when it stays within these boundaries:

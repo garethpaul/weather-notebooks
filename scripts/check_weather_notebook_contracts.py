@@ -67,10 +67,13 @@ ANALYSIS_PROVENANCE_PLAN_PATH = (
 STABLE_RESULT_COUNT_PLAN_PATH = (
     ROOT / "docs" / "plans" / "2026-06-16-stable-noaa-result-count.md"
 )
+JUPYTERLAB_SECURITY_PLAN_PATH = (
+    ROOT / "docs" / "plans" / "2026-06-20-jupyterlab-security-update.md"
+)
 CI_WORKFLOW_PATH = ROOT / ".github" / "workflows" / "check.yml"
 LOCKFILE_SHA256 = {
-    "requirements-py312.lock": "552696e4d187043dac40208e56287c27994016e696b27adca9616ad463167e0a",
-    "requirements-py314.lock": "bd4805956fb10e570cc02bc32c4021caef6c553f12a167359fff7e72656165d1",
+    "requirements-py312.lock": "b59381ed41e79c40080b1ec5f772559bcc26bf33fa746e3d242304c24142fa4c",
+    "requirements-py314.lock": "f4346cb498a51f19ea5123454dc06942fb68d80bd0a837ac2f16d37d34988876",
 }
 
 EXPECTED_WORKFLOW = """name: Check
@@ -560,6 +563,7 @@ def test_completed_plans_are_in_docs_plans():
     assert_completed_plan(CONFLICTING_OBSERVATION_PLAN_PATH, "conflicting NOAA observations")
     assert_completed_plan(ANALYSIS_PROVENANCE_PLAN_PATH, "weather analysis provenance")
     assert_completed_plan(STABLE_RESULT_COUNT_PLAN_PATH, "stable NOAA result count")
+    assert_completed_plan(JUPYTERLAB_SECURITY_PLAN_PATH, "JupyterLab security update")
     checker_main = Path(__file__).read_text().rsplit("def main():", 1)[1]
     assert_true(
         "test_synthetic_analysis_flow_is_exercised," in checker_main,
@@ -723,6 +727,10 @@ def test_dependency_and_ci_contracts():
         assert_true(
             locked_packages.get("jupyter-server") == "2.20.0",
             "{0} must contain the reviewed jupyter-server security pin".format(lock_name),
+        )
+        assert_true(
+            locked_packages.get("jupyterlab") == "4.5.9",
+            "{0} must contain the reviewed jupyterlab security pin".format(lock_name),
         )
 
     workflow = CI_WORKFLOW_PATH.read_text()

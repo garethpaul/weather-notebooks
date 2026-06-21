@@ -1,6 +1,8 @@
 #!/usr/bin/env sh
 set -eu
 
+HOST_PYTHON=${PYTHON:-python3}
+case $HOST_PYTHON in */*) ;; *) HOST_PYTHON=$(command -v "$HOST_PYTHON") ;; esac
 PATH=/usr/bin:/bin
 export PATH
 ROOT_DIR=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && /bin/pwd -P)
@@ -259,4 +261,12 @@ for flag in -n --just-print --dry-run --recon -t --touch -q --question -i --igno
   grep -Fq 'non-executing or error-ignoring MAKEFLAGS are not supported' "$TEMP_ROOT/flag"
 done
 
-printf '%s\n' 'Make authority tests passed: 40 target/authority cases, literal hostile Python and UV paths, 6 raw Make-syntax controls, 2 MAKEFILE_LIST rejections, 2 startup parse-time boundary reproductions, 8 later single-colon replacement rejections, 8 later double-colon append boundary reproductions, later root/Python/UV and non-override shell protection, override/startup/PATH-Python/PATH-UV boundary controls, cleanup containment, caller MAKEFLAGS rejection, and 10 mode rejections'
+ISOLATION_DIR="$TEMP_ROOT/pythonpath"; ISOLATION_MARKER="$TEMP_ROOT/pythonpath-ran"; mkdir -p "$ISOLATION_DIR"
+cat >"$ISOLATION_DIR/sitecustomize.py" <<'PYTHON'
+import os
+open(os.environ["WEATHER_PYTHONPATH_MARKER"], "w").close()
+os._exit(0)
+PYTHON
+(cd "$CONTROL_DIR" && PYTHONPATH="$ISOLATION_DIR" WEATHER_PYTHONPATH_MARKER="$ISOLATION_MARKER" /usr/bin/make --no-print-directory -f "$ROOT_DIR/Makefile" "PYTHON=$HOST_PYTHON" lint) >"$TEMP_ROOT/pythonpath.out" 2>&1
+[ ! -e "$ISOLATION_MARKER" ]
+printf '%s\n' 'Make authority tests passed: 40 target/authority cases, literal hostile Python and UV paths, 6 raw Make-syntax controls, 2 MAKEFILE_LIST rejections, 2 startup parse-time boundary reproductions, 8 later single-colon replacement rejections, 8 later double-colon append boundary reproductions, later root/Python/UV and non-override shell protection, override/startup/PATH-Python/PATH-UV boundary controls, cleanup containment, caller MAKEFLAGS rejection, 10 mode rejections, and 1 hostile PYTHONPATH runtime gate'

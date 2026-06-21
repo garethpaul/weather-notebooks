@@ -51,7 +51,8 @@ override MAKEFILES :=
 ifneq ($(origin MAKEFILE_LIST),file)
 $(error MAKEFILE_LIST must not be overridden)
 endif
-override ROOT := $(shell path='$(subst ','"'"',$(value MAKEFILE_LIST))'; path=$$(printf '%s' "$$path" | /usr/bin/sed 's/^ //'); [ -f "$$path" ] || exit 1; directory=$$(/usr/bin/dirname -- "$$path"); CDPATH= cd -- "$$directory" && /bin/pwd -P)
+override REPOSITORY_SED := $(shell if [ -x /usr/bin/sed ]; then /usr/bin/printf '%s' /usr/bin/sed; elif [ -x /bin/sed ]; then /usr/bin/printf '%s' /bin/sed; fi)
+override ROOT := $(shell path='$(subst ','"'"',$(value MAKEFILE_LIST))'; path=$$(printf '%s' "$$path" | '$(REPOSITORY_SED)' 's/^ //'); [ -f "$$path" ] || exit 1; directory=$${path%/*}; [ "$$directory" != "$$path" ] || directory=.; CDPATH= cd -- "$$directory" && /bin/pwd -P)
 export ROOT
 ifeq ($(strip $(ROOT)),)
 $(error repository Makefile path could not be resolved)
@@ -62,7 +63,7 @@ override REPOSITORY_PYTHON_LITERAL := $(call REPOSITORY_SHELL_LITERAL,$(PYTHON))
 override REPOSITORY_UV_LITERAL := $(call REPOSITORY_SHELL_LITERAL,$(UV))
 
 build check clean lint lock root-test test verify:: $$(if $$(filter file,$$(origin MAKEFILE_LIST)),,$$(error MAKEFILE_LIST must not be overridden))
-build check clean lint lock root-test test verify:: $$(if $$(shell path=$$$$(/usr/bin/printf '%s' '$$(subst ','"'"',$$(MAKEFILE_LIST))' | /usr/bin/sed 's/^ //') && [ -f "$$$$path" ] && /usr/bin/printf '%s' ok),,$$(error repository Makefile must be loaded alone))
+build check clean lint lock root-test test verify:: $$(if $$(shell path=$$$$(/usr/bin/printf '%s' '$$(subst ','"'"',$$(MAKEFILE_LIST))' | '$$(REPOSITORY_SED)' 's/^ //') && [ -f "$$$$path" ] && /usr/bin/printf '%s' ok),,$$(error repository Makefile must be loaded alone))
 build check clean lint lock root-test test verify:: __repository-make-authority
 
 __repository-make-authority::
@@ -74,15 +75,15 @@ clean::
 	/usr/bin/find '$(REPOSITORY_ROOT_LITERAL)' -type d -name '__pycache__' -prune -exec /bin/rm -rf {} +
 
 lint::
-	PYTHONDONTWRITEBYTECODE=1 '$(REPOSITORY_PYTHON_LITERAL)' -m py_compile '$(REPOSITORY_ROOT_LITERAL)/weather_notebook.py' '$(REPOSITORY_ROOT_LITERAL)/weather_notebook_tests.py' '$(REPOSITORY_ROOT_LITERAL)/scripts/check_weather_notebook_contracts.py'
+	PYTHONDONTWRITEBYTECODE=1 '$(REPOSITORY_PYTHON_LITERAL)' -I -B -m py_compile '$(REPOSITORY_ROOT_LITERAL)/weather_notebook.py' '$(REPOSITORY_ROOT_LITERAL)/weather_notebook_tests.py' '$(REPOSITORY_ROOT_LITERAL)/scripts/check_weather_notebook_contracts.py'
 
 lock::
 	'$(REPOSITORY_UV_LITERAL)' pip compile '$(REPOSITORY_ROOT_LITERAL)/requirements.txt' --python-version 3.12 --python-platform x86_64-manylinux_2_28 --default-index https://pypi.org/simple --generate-hashes --custom-compile-command 'make lock' --output-file '$(REPOSITORY_ROOT_LITERAL)/requirements-py312.lock'
 	'$(REPOSITORY_UV_LITERAL)' pip compile '$(REPOSITORY_ROOT_LITERAL)/requirements.txt' --python-version 3.14 --python-platform x86_64-manylinux_2_28 --default-index https://pypi.org/simple --generate-hashes --custom-compile-command 'make lock' --output-file '$(REPOSITORY_ROOT_LITERAL)/requirements-py314.lock'
 
 test::
-	PYTHONPATH='$(REPOSITORY_ROOT_LITERAL)' PYTHONDONTWRITEBYTECODE=1 '$(REPOSITORY_PYTHON_LITERAL)' -m unittest weather_notebook_tests
-	PYTHONDONTWRITEBYTECODE=1 '$(REPOSITORY_PYTHON_LITERAL)' '$(REPOSITORY_ROOT_LITERAL)/scripts/check_weather_notebook_contracts.py'
+	cd '$(REPOSITORY_ROOT_LITERAL)' && PYTHONDONTWRITEBYTECODE=1 '$(REPOSITORY_PYTHON_LITERAL)' -I -B -c 'import runpy, sys; sys.path.insert(0, "."); runpy.run_path("weather_notebook_tests.py", run_name="__main__")'
+	PYTHONDONTWRITEBYTECODE=1 '$(REPOSITORY_PYTHON_LITERAL)' -I -B '$(REPOSITORY_ROOT_LITERAL)/scripts/check_weather_notebook_contracts.py'
 
 build::
 	@/usr/bin/printf '%s\n' 'Notebook project: no build artifact to compile.'

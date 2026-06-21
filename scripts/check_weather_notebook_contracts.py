@@ -779,8 +779,9 @@ def test_dependency_and_ci_contracts():
         "Makefile cleanup must stay inside the repository",
     )
     assert_true(
-        "PYTHONPATH='$(REPOSITORY_ROOT_LITERAL)' PYTHONDONTWRITEBYTECODE=1 "
-        "'$(REPOSITORY_PYTHON_LITERAL)' -m unittest weather_notebook_tests" in makefile,
+        "'$(REPOSITORY_PYTHON_LITERAL)' -I -B -c "
+        "'import runpy, sys; sys.path.insert(0, \".\"); "
+        "runpy.run_path(\"weather_notebook_tests.py\", run_name=\"__main__\")'" in makefile,
         "Makefile must run executable NOAA helper tests",
     )
     assert_true("verify:: root-test lint test build" in makefile_lines, "full verification must run authority tests")

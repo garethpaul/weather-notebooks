@@ -9,6 +9,7 @@ but callers could still replace the recipe shell, load startup makefiles,
 override the Makefile list, select non-executing or error-ignoring modes,
 embed Make syntax in executable values, or append single-colon public recipes
 after the reviewed file.
+Startup makefiles can run parse-time Make functions before the repository Makefile rejects them.
 
 ## Requirements
 
@@ -30,6 +31,7 @@ after the reviewed file.
 - Do not change NOAA request behavior, notebook contents, dependency pins,
   lockfile bytes, or scientific output.
 - Keep `make lock` outside the default offline verification gate.
+- Caller-supplied double-colon public recipes and startup makefile parse-time code are outside the local Make trust boundary.
 - Caller-supplied GNU Make `override` directives and `PATH` selection of the
   default `python3` and `uv` remain explicit trust boundaries.
 
@@ -38,10 +40,11 @@ after the reviewed file.
 - Repository and external-directory `make check` passed 27 unit tests and 20
   notebook contracts without loading a NOAA token or making a live request.
 - The authority harness passed 40 public-target/root/shell cases, six raw
-  Make-syntax controls, two Makefile-list rejections, two startup boundaries,
-  eight later recipe-replacement rejections, later root/Python/uv and shell
-  controls, PATH boundaries, cleanup containment, caller `MAKEFLAGS`, and ten
-  unsafe-mode rejections.
+  Make-syntax controls, two Makefile-list rejections, two startup parse-time
+  boundary reproductions, eight later single-colon replacement rejections,
+  eight later double-colon append boundary reproductions, later root/Python/uv
+  and shell controls, PATH boundaries, cleanup containment, caller
+  `MAKEFLAGS`, and ten unsafe-mode rejections.
 - Python and shell syntax, workflow YAML, notebook JSON, lockfile digests,
   `git diff --check`, intended-path, artifact, and changed-line credential
   audits passed.

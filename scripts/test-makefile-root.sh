@@ -3,7 +3,7 @@ set -eu
 
 PATH=/usr/bin:/bin
 export PATH
-ROOT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")/.." && /bin/pwd -P)
+ROOT_DIR=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && /bin/pwd -P)
 TEMP_ROOT=$(mktemp -d "${TMPDIR:-/tmp}/weather-notebooks-make-authority-XXXXXX")
 trap 'rm -rf "$TEMP_ROOT"' EXIT HUP INT TERM
 unset MAKEFILES MAKEFILE_LIST MAKEFLAGS MFLAGS MAKEOVERRIDES PYTHON ROOT SHELL UV
@@ -15,10 +15,23 @@ AUTHORITY_PATH="$TEMP_ROOT/no-unreviewed-tools"
 LOG="$TEMP_ROOT/commands.log"
 SHELL_LOG="$TEMP_ROOT/shell.log"
 mkdir -p "$CONTROL_DIR" "$CHECKOUT/scripts" "$ATTACKER_ROOT" "$AUTHORITY_PATH"
-CONTROL_DIR=$(CDPATH= cd -- "$CONTROL_DIR" && /bin/pwd -P)
-CHECKOUT=$(CDPATH= cd -- "$CHECKOUT" && /bin/pwd -P)
+CONTROL_DIR=$(CDPATH='' cd -- "$CONTROL_DIR" && /bin/pwd -P)
+CHECKOUT=$(CDPATH='' cd -- "$CHECKOUT" && /bin/pwd -P)
 MAKEFILE="$CHECKOUT/Makefile"
 cp "$ROOT_DIR/Makefile" "$MAKEFILE"
+
+require_text() {
+  file=$1
+  text=$2
+  if ! grep -Fq "$text" "$ROOT_DIR/$file"; then
+    printf '%s must document Make boundary: %s\n' "$file" "$text" >&2
+    exit 1
+  fi
+}
+
+require_text README.md 'Caller-supplied double-colon public recipes and startup makefile parse-time code are outside the local Make trust boundary.'
+require_text CHANGES.md 'Documented caller-added double-colon public recipes and startup parse-time Make code as outside the local Make trust boundary.'
+require_text docs/plans/2026-06-21-make-authority-isolation.md 'Startup makefiles can run parse-time Make functions before the repository Makefile rejects them.'
 
 FAKE_PYTHON="$TEMP_ROOT/trusted python's \"quoted\" \`touch WEATHER_PYTHON_MARKER\` \$literal"
 cat >"$FAKE_PYTHON" <<'SCRIPT'
@@ -122,17 +135,37 @@ if (cd "$CONTROL_DIR" && PATH="$AUTHORITY_PATH" MAKEFILE_LIST="$MAKEFILE" /usr/b
 grep -Fq 'MAKEFILE_LIST must not be overridden' "$TEMP_ROOT/makefile-list-environment"
 
 STARTUP_MAKE="$TEMP_ROOT/startup.mk"
-printf 'STARTUP_LOADED := yes\n' >"$STARTUP_MAKE"
+STARTUP_ENV_MARKER="$TEMP_ROOT/startup-environment-marker"
+STARTUP_COMMAND_MARKER="$TEMP_ROOT/startup-command-marker"
+printf '%s\n' "\$(shell /usr/bin/touch '$STARTUP_ENV_MARKER')" >"$STARTUP_MAKE"
 if (cd "$CONTROL_DIR" && PATH="$AUTHORITY_PATH" MAKEFILES="$STARTUP_MAKE" /usr/bin/make --no-print-directory -f "$MAKEFILE" check) >"$TEMP_ROOT/startup-environment" 2>&1; then exit 1; fi
 grep -Fq 'MAKEFILES must be empty' "$TEMP_ROOT/startup-environment"
+[ -e "$STARTUP_ENV_MARKER" ]
+printf '%s\n' "\$(shell /usr/bin/touch '$STARTUP_COMMAND_MARKER')" >"$STARTUP_MAKE"
 if (cd "$CONTROL_DIR" && PATH="$AUTHORITY_PATH" /usr/bin/make --no-print-directory -f "$MAKEFILE" "MAKEFILES=$STARTUP_MAKE" check) >"$TEMP_ROOT/startup-command" 2>&1; then exit 1; fi
 grep -Fq 'MAKEFILES must be empty' "$TEMP_ROOT/startup-command"
+[ -e "$STARTUP_COMMAND_MARKER" ]
 
 for target in build check clean lint lock root-test test verify; do
   later="$TEMP_ROOT/later-$target.mk"
   printf '%s:\n\t/usr/bin/touch %s\n' "$target" "$TEMP_ROOT/replaced-$target" >"$later"
   if (cd "$CONTROL_DIR" && PATH="$AUTHORITY_PATH" /usr/bin/make --no-print-directory -f "$MAKEFILE" -f "$later" "PYTHON=$FAKE_PYTHON" "UV=$FAKE_UV" "$target") >"$TEMP_ROOT/later-$target.out" 2>&1; then exit 1; fi
   [ ! -e "$TEMP_ROOT/replaced-$target" ]
+done
+
+for target in build check clean lint lock root-test test verify; do
+  later_append="$TEMP_ROOT/later-append-$target.mk"
+  append_marker="$TEMP_ROOT/appended-$target"
+  printf 'build check clean lint lock root-test test verify: MAKEFILE_LIST := %s\n' "$MAKEFILE" >"$later_append"
+  printf '%s::\n\t@/usr/bin/touch %s\n' "$target" "$append_marker" >>"$later_append"
+  rm -f "$LOG" "$append_marker"
+  (cd "$CONTROL_DIR" && PATH="$AUTHORITY_PATH" WEATHER_COMMAND_LOG="$LOG" /usr/bin/make --no-print-directory -f "$MAKEFILE" -f "$later_append" "PYTHON=$FAKE_PYTHON" "UV=$FAKE_UV" "$target") >"$TEMP_ROOT/later-append-$target.out" 2>&1
+  [ -e "$append_marker" ]
+  case "$target" in
+    build) grep -Fq 'Notebook project: no build artifact to compile.' "$TEMP_ROOT/later-append-$target.out" ;;
+    clean) : ;;
+    *) grep -Fq "$CHECKOUT" "$LOG" ;;
+  esac
 done
 
 TARGET_PYTHON="$TEMP_ROOT/target-python"
@@ -226,4 +259,4 @@ for flag in -n --just-print --dry-run --recon -t --touch -q --question -i --igno
   grep -Fq 'non-executing or error-ignoring MAKEFLAGS are not supported' "$TEMP_ROOT/flag"
 done
 
-printf '%s\n' 'Make authority tests passed: 40 target/authority cases, literal hostile Python and UV paths, 6 raw Make-syntax controls, 2 MAKEFILE_LIST rejections, 2 startup-boundary cases, 8 later recipe-replacement rejections, later root/Python/UV and non-override shell protection, override/startup/PATH-Python/PATH-UV boundary controls, cleanup containment, caller MAKEFLAGS rejection, and 10 mode rejections'
+printf '%s\n' 'Make authority tests passed: 40 target/authority cases, literal hostile Python and UV paths, 6 raw Make-syntax controls, 2 MAKEFILE_LIST rejections, 2 startup parse-time boundary reproductions, 8 later single-colon replacement rejections, 8 later double-colon append boundary reproductions, later root/Python/UV and non-override shell protection, override/startup/PATH-Python/PATH-UV boundary controls, cleanup containment, caller MAKEFLAGS rejection, and 10 mode rejections'

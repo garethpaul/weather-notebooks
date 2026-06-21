@@ -73,6 +73,7 @@ The setup commands above are derived from repository files. Legacy mobile, Pytho
   syntax, and later public-recipe replacement. `PYTHON` and `UV` remain
   literal caller-selectable executables; `PATH` lookup for their defaults and
   later GNU Make `override` directives are explicit trust boundaries.
+- Caller-supplied double-colon public recipes and startup makefile parse-time code are outside the local Make trust boundary.
 - GitHub Actions installs the exact scientific stack and runs offline contracts
   on every push, pull request, and manual dispatch for Python 3.12 and 3.14 on
   Ubuntu 24.04 with read-only permissions, immutable action pins,

@@ -809,8 +809,9 @@ def test_dependency_and_ci_contracts():
         "literal hostile Python and UV paths",
         "6 raw Make-syntax controls",
         "2 MAKEFILE_LIST rejections",
-        "2 startup-boundary cases",
-        "8 later recipe-replacement rejections",
+        "2 startup parse-time boundary reproductions",
+        "8 later single-colon replacement rejections",
+        "8 later double-colon append boundary reproductions",
         "PATH-Python/PATH-UV boundary controls",
         "cleanup containment",
         "10 mode rejections",
@@ -824,6 +825,16 @@ def test_dependency_and_ci_contracts():
             "GitHub Actions" in (ROOT / docs_file).read_text(),
             "{0} must document the GitHub Actions baseline".format(docs_file),
         )
+    docs_text = "\n".join(
+        (ROOT / docs_file).read_text()
+        for docs_file in ("README.md", "CHANGES.md", "docs/plans/2026-06-21-make-authority-isolation.md")
+    )
+    for phrase in (
+        "Caller-supplied double-colon public recipes and startup makefile parse-time code are outside the local Make trust boundary.",
+        "Documented caller-added double-colon public recipes and startup parse-time Make code as outside the local Make trust boundary.",
+        "Startup makefiles can run parse-time Make functions before the repository Makefile rejects them.",
+    ):
+        assert_true(phrase in docs_text, "Make boundary documentation must include {0!r}".format(phrase))
 
 
 def main():

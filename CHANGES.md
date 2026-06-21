@@ -5,6 +5,7 @@
 - Isolated Make verification authority from caller-controlled roots, shells,
   startup files, Makefile lists, unsafe modes, executable Make syntax, and
   later single-colon public recipe replacement.
+- Documented caller-added double-colon public recipes and startup parse-time Make code as outside the local Make trust boundary.
 - Added literal Python/uv, lock-command, cleanup-containment, and external-root
   authority coverage and invoked hosted verification through `/usr/bin/make`.
 

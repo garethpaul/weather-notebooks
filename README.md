@@ -68,11 +68,17 @@ The setup commands above are derived from repository files. Legacy mobile, Pytho
   fake-HTTP tests for pagination, payload validation, failure propagation,
   request bounds, and unit conversions.
 - `make check` runs `make verify` with bytecode cleanup before and after.
+- The Make entry points derive their root from the reviewed Makefile and reject
+  caller shell, startup-file, Makefile-list, unsafe-mode, executable Make
+  syntax, and later public-recipe replacement. `PYTHON` and `UV` remain
+  literal caller-selectable executables; `PATH` lookup for their defaults and
+  later GNU Make `override` directives are explicit trust boundaries.
 - GitHub Actions installs the exact scientific stack and runs offline contracts
   on every push, pull request, and manual dispatch for Python 3.12 and 3.14 on
   Ubuntu 24.04 with read-only permissions, immutable action pins,
   credential-free checkout, and cancellation for superseded runs.
-- The hosted matrix also reruns `make check` from an external working directory.
+- The hosted matrix invokes `/usr/bin/make` and reruns the full gate from an
+  external working directory.
 - `python3 scripts/check_weather_notebook_contracts.py` runs just the notebook contracts.
 - `python3 -m unittest weather_notebook_tests` runs the executable NOAA helper
   tests plus an offline synthetic flow through fake responses, date bucketing,

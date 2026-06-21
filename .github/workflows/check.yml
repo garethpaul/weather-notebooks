@@ -40,6 +40,6 @@ jobs:
       - name: Verify scientific stack imports
         run: python -c "import jupyter, matplotlib, numpy, pandas, requests"
       - name: Run repository checks
-        run: make check
+        run: /usr/bin/make check
       - name: Verify external working directory
-        run: cd "$(mktemp -d)" && make -f "$GITHUB_WORKSPACE/Makefile" check
+        run: cd "$(mktemp -d)" && /usr/bin/make -f "$GITHUB_WORKSPACE/Makefile" check

@@ -70,6 +70,9 @@ STABLE_RESULT_COUNT_PLAN_PATH = (
 JUPYTERLAB_SECURITY_PLAN_PATH = (
     ROOT / "docs" / "plans" / "2026-06-20-jupyterlab-security-update.md"
 )
+MAKE_AUTHORITY_PLAN_PATH = (
+    ROOT / "docs" / "plans" / "2026-06-21-make-authority-isolation.md"
+)
 CI_WORKFLOW_PATH = ROOT / ".github" / "workflows" / "check.yml"
 LOCKFILE_SHA256 = {
     "requirements-py312.lock": "b59381ed41e79c40080b1ec5f772559bcc26bf33fa746e3d242304c24142fa4c",
@@ -118,9 +121,9 @@ jobs:
       - name: Verify scientific stack imports
         run: python -c \"import jupyter, matplotlib, numpy, pandas, requests\"
       - name: Run repository checks
-        run: make check
+        run: /usr/bin/make check
       - name: Verify external working directory
-        run: cd \"$(mktemp -d)\" && make -f \"$GITHUB_WORKSPACE/Makefile\" check
+        run: cd \"$(mktemp -d)\" && /usr/bin/make -f \"$GITHUB_WORKSPACE/Makefile\" check
 """
 
 
@@ -564,6 +567,7 @@ def test_completed_plans_are_in_docs_plans():
     assert_completed_plan(ANALYSIS_PROVENANCE_PLAN_PATH, "weather analysis provenance")
     assert_completed_plan(STABLE_RESULT_COUNT_PLAN_PATH, "stable NOAA result count")
     assert_completed_plan(JUPYTERLAB_SECURITY_PLAN_PATH, "JupyterLab security update")
+    assert_completed_plan(MAKE_AUTHORITY_PLAN_PATH, "Make authority isolation")
     checker_main = Path(__file__).read_text().rsplit("def main():", 1)[1]
     assert_true(
         "test_synthetic_analysis_flow_is_exercised," in checker_main,
@@ -740,26 +744,78 @@ def test_dependency_and_ci_contracts():
 
     makefile = (ROOT / "Makefile").read_text()
     makefile_lines = set(makefile.splitlines())
+    for contract in (
+        ".DEFAULT_GOAL := check",
+        ".SECONDEXPANSION:",
+        "PYTHON ?= python3",
+        "override PYTHON := $(value PYTHON)",
+        "UV ?= uv",
+        "override UV := $(value UV)",
+        "override SHELL := /bin/sh",
+        "override .SHELLFLAGS := -c",
+        "override MAKEFILES :=",
+        "ifneq ($(origin MAKEFILE_LIST),file)",
+        "export ROOT",
+        "root-test::",
+        "\t/bin/sh '$(REPOSITORY_ROOT_LITERAL)/scripts/test-makefile-root.sh'",
+        "$(eval $(REPOSITORY_PUBLIC_RECIPES))",
+    ):
+        assert_true(contract in makefile_lines, "Makefile authority contract is missing {0!r}".format(contract))
+    assert_true("MAKEFLAGS must not be overridden" in makefile, "Makefile must reject caller MAKEFLAGS")
+    assert_true("MAKEFILES must be empty" in makefile, "Makefile must reject startup files")
+    assert_true("MAKEFILE_LIST must not be overridden" in makefile, "Makefile must reject Makefile-list replacement")
+    assert_true("PYTHON must be a literal executable path" in makefile, "Makefile must reject Python Make syntax")
+    assert_true("UV must be a literal executable path" in makefile, "Makefile must reject uv Make syntax")
     assert_true(
-        "override ROOT := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))" in makefile_lines,
-        "Makefile must protect the repository resolved from its own path",
+        "'$(REPOSITORY_ROOT_LITERAL)/scripts/test-makefile-root.sh'" in makefile,
+        "Makefile must use the rooted authority harness",
     )
-    assert_true("PYTHON ?= python3" in makefile_lines, "Makefile must preserve the Python command override")
-    assert_true("$(ROOT)/scripts/check_weather_notebook_contracts.py" in makefile, "Makefile must use the rooted contract path")
-    assert_true('find "$(ROOT)"' in makefile, "Makefile cleanup must stay inside the repository")
-    assert_true('$(MAKE) -C "$(ROOT)" clean' in makefile, "recursive cleanup must stay rooted")
-    assert_true("$(PYTHON) -m unittest weather_notebook_tests" in makefile, "Makefile must run executable NOAA helper tests")
+    assert_true(
+        "scripts/check_weather_notebook_contracts.py" in makefile,
+        "Makefile must use the rooted notebook contract path",
+    )
+    assert_true(
+        "/usr/bin/find '$(REPOSITORY_ROOT_LITERAL)'" in makefile,
+        "Makefile cleanup must stay inside the repository",
+    )
+    assert_true(
+        "PYTHONPATH='$(REPOSITORY_ROOT_LITERAL)' PYTHONDONTWRITEBYTECODE=1 "
+        "'$(REPOSITORY_PYTHON_LITERAL)' -m unittest weather_notebook_tests" in makefile,
+        "Makefile must run executable NOAA helper tests",
+    )
+    assert_true("verify:: root-test lint test build" in makefile_lines, "full verification must run authority tests")
     lock_command_template = (
-        'cd "$(ROOT)" && uv pip compile requirements.txt --python-version {python_version} '
+        "'$(REPOSITORY_UV_LITERAL)' pip compile '$(REPOSITORY_ROOT_LITERAL)/requirements.txt' "
+        "--python-version {python_version} "
         '--python-platform x86_64-manylinux_2_28 --default-index https://pypi.org/simple '
-        "--generate-hashes --custom-compile-command 'make lock' --output-file {lockfile}"
+        "--generate-hashes --custom-compile-command 'make lock' "
+        "--output-file '$(REPOSITORY_ROOT_LITERAL)/{lockfile}'"
     )
     for python_version, lockfile in (("3.12", "requirements-py312.lock"), ("3.14", "requirements-py314.lock")):
         assert_true(
             lock_command_template.format(python_version=python_version, lockfile=lockfile) in makefile,
             "Makefile must preserve the reviewed {0} lock command".format(python_version),
         )
-    assert_true(makefile.count("uv pip compile requirements.txt") == 2, "Makefile must define exactly two lock commands")
+    assert_true(
+        makefile.count(
+            "'$(REPOSITORY_UV_LITERAL)' pip compile '$(REPOSITORY_ROOT_LITERAL)/requirements.txt'"
+        ) == 2,
+        "Makefile must define exactly two frozen lock commands",
+    )
+
+    authority_test = (ROOT / "scripts" / "test-makefile-root.sh").read_text()
+    for contract in (
+        "40 target/authority cases",
+        "literal hostile Python and UV paths",
+        "6 raw Make-syntax controls",
+        "2 MAKEFILE_LIST rejections",
+        "2 startup-boundary cases",
+        "8 later recipe-replacement rejections",
+        "PATH-Python/PATH-UV boundary controls",
+        "cleanup containment",
+        "10 mode rejections",
+    ):
+        assert_true(contract in authority_test, "Make authority harness must include {0!r}".format(contract))
     assert_true(RUNTIME_MODULE.is_file(), "NOAA runtime helpers must be importable")
     assert_true(RUNTIME_TESTS.is_file(), "NOAA runtime helper tests must be checked in")
 

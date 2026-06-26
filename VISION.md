@@ -34,6 +34,8 @@ Priority:
 - Keep GitHub Actions running the offline `make check` baseline before review
 - Avoid presenting historical data as current conditions
 - Keep the scientific environment exactly pinned and import-verified in CI
+- Keep Matplotlib synchronized across the direct requirement and both reviewed
+  Python 3.12/3.14 lock graphs without unrelated dependency drift
 - Keep README setup and exact dependency requirements aligned with the supported lockfiles
 - Exercise the complete offline analysis flow from synthetic NOAA responses
   through dataframe construction and a headless average-temperature plot

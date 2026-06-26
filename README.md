@@ -47,7 +47,7 @@ only to regenerate both lockfiles with `make lock`, not for normal setup.
 The direct dependency requirements are:
 
 - `jupyter==1.1.1`
-- `matplotlib==3.10.9`
+- `matplotlib==3.11.0`
 - `numpy==2.4.6`
 - `pandas==3.0.3`
 - `requests==2.34.2`

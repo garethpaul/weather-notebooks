@@ -76,10 +76,13 @@ MAKE_AUTHORITY_PLAN_PATH = (
 README_SETUP_PLAN_PATH = (
     ROOT / "docs" / "plans" / "2026-06-26-readme-setup-and-dependencies.md"
 )
+MATPLOTLIB_REFRESH_PLAN_PATH = (
+    ROOT / "docs" / "plans" / "2026-06-26-matplotlib-3.11.0-refresh.md"
+)
 CI_WORKFLOW_PATH = ROOT / ".github" / "workflows" / "check.yml"
 LOCKFILE_SHA256 = {
-    "requirements-py312.lock": "b59381ed41e79c40080b1ec5f772559bcc26bf33fa746e3d242304c24142fa4c",
-    "requirements-py314.lock": "f4346cb498a51f19ea5123454dc06942fb68d80bd0a837ac2f16d37d34988876",
+    "requirements-py312.lock": "dd4346f346397fde4de14614b1510a9a7c7ed74444aed1e3c6fd7f387593cdb7",
+    "requirements-py314.lock": "2521fca259203f72004966359210fc7ae76b5f2b5c8b2f233f8a8bdc1e0bef29",
 }
 
 EXPECTED_WORKFLOW = """name: Check
@@ -572,6 +575,7 @@ def test_completed_plans_are_in_docs_plans():
     assert_completed_plan(JUPYTERLAB_SECURITY_PLAN_PATH, "JupyterLab security update")
     assert_completed_plan(MAKE_AUTHORITY_PLAN_PATH, "Make authority isolation")
     assert_completed_plan(README_SETUP_PLAN_PATH, "README setup and dependencies")
+    assert_completed_plan(MATPLOTLIB_REFRESH_PLAN_PATH, "Matplotlib 3.11.0 refresh")
     checker_main = Path(__file__).read_text().rsplit("def main():", 1)[1]
     assert_true(
         "test_synthetic_analysis_flow_is_exercised," in checker_main,
@@ -685,7 +689,7 @@ def test_analysis_provenance_is_visible_and_deterministic():
 def test_dependency_and_ci_contracts():
     expected_requirements = [
         "jupyter==1.1.1",
-        "matplotlib==3.10.9",
+        "matplotlib==3.11.0",
         "numpy==2.4.6",
         "pandas==3.0.3",
         "requests==2.34.2",

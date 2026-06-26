@@ -1,5 +1,75 @@
 # Changes
 
+## 2026-06-26 13:48 PDT - P3 - Refresh Matplotlib across reviewed locks
+
+### Summary
+
+Updated the exact Matplotlib pin from 3.10.9 to 3.11.0 across the direct
+requirements and both reviewed Linux lock graphs.
+
+### Work completed
+
+- Regenerated the Python 3.12 and 3.14 hash-locked graphs with canonical
+  `make lock` using `uv 0.11.23`.
+- Confirmed Matplotlib was the only package version changed in either lock.
+- Updated the fail-closed direct dependency and complete-lock digest contracts.
+- Preserved NOAA request behavior, dataframe construction, plotting helpers,
+  notebook content, and live-token boundaries unchanged.
+
+### Threads
+
+- Started: none — the dependency refresh was completed directly.
+- Continued: none.
+- Stopped: none.
+
+### Files changed
+
+- `requirements.txt`, `requirements-py312.lock`, and
+  `requirements-py314.lock` — pin Matplotlib 3.11.0 with reviewed hashes.
+- `scripts/check_weather_notebook_contracts.py` — updates exact requirements,
+  lock digests, and completed-plan registration.
+- `README.md`, `VISION.md`, and
+  `docs/plans/2026-06-26-matplotlib-3.11.0-refresh.md` — document scope and
+  verification evidence.
+
+### Validation
+
+- Dependency review — Jupyter, NumPy, pandas, and Requests remained current;
+  Matplotlib 3.11.0 requires Python 3.11+ and supports both maintained runtimes.
+- Lock comparison — exactly one version changed in each graph:
+  `matplotlib==3.10.9` to `matplotlib==3.11.0`.
+- The unsupported host Python 3.11 environment has an incomplete global
+  Requests installation and is not used as authoritative evidence.
+- Fresh Python 3.12 and 3.14 hashed installs passed scientific imports and
+  `pip check` with Matplotlib 3.11.0.
+- Both runtimes passed checkout-local and external-directory `make check`:
+  27 offline tests, 21 static contracts, and all 40 Make authority cases.
+- Isolated mutations restoring Matplotlib 3.10.9 and changing a lockfile digest
+  failed on the intended direct-pin and reviewed-digest assertions.
+- `git diff --check` passed; exact-head review and hosted verification remain
+  the final pre-merge actions.
+- Hosted Python 3.12 and 3.14 hash-locked gates plus CodeQL Actions and Python
+  analysis passed on PR #15.
+- `$codex-review` was invoked against `origin/master` but OpenAI authentication
+  returned HTTP 401 before analysis; an immutable manual review confirmed the
+  PR head and local head matched and both lock graphs changed only Matplotlib.
+
+### Bugs / findings
+
+- P3: the scientific direct pins lagged the current Matplotlib feature release
+  while every other direct dependency remained current.
+
+### Blockers
+
+- None; supported-runtime disposable environments are available.
+- The Codex review helper cannot authenticate to the OpenAI API in this
+  environment; no model finding was produced or silently ignored.
+
+### Next action
+
+- Re-run exact-head gates after this evidence-only amendment and merge only the
+  reviewed hosted-green head.
+
 ## 2026-06-26
 
 - Priority P2 cycle: completed the only explicit roadmap gap; no delegated

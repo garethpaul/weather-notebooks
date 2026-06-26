@@ -73,6 +73,9 @@ JUPYTERLAB_SECURITY_PLAN_PATH = (
 MAKE_AUTHORITY_PLAN_PATH = (
     ROOT / "docs" / "plans" / "2026-06-21-make-authority-isolation.md"
 )
+README_SETUP_PLAN_PATH = (
+    ROOT / "docs" / "plans" / "2026-06-26-readme-setup-and-dependencies.md"
+)
 CI_WORKFLOW_PATH = ROOT / ".github" / "workflows" / "check.yml"
 LOCKFILE_SHA256 = {
     "requirements-py312.lock": "b59381ed41e79c40080b1ec5f772559bcc26bf33fa746e3d242304c24142fa4c",
@@ -568,6 +571,7 @@ def test_completed_plans_are_in_docs_plans():
     assert_completed_plan(STABLE_RESULT_COUNT_PLAN_PATH, "stable NOAA result count")
     assert_completed_plan(JUPYTERLAB_SECURITY_PLAN_PATH, "JupyterLab security update")
     assert_completed_plan(MAKE_AUTHORITY_PLAN_PATH, "Make authority isolation")
+    assert_completed_plan(README_SETUP_PLAN_PATH, "README setup and dependencies")
     checker_main = Path(__file__).read_text().rsplit("def main():", 1)[1]
     assert_true(
         "test_synthetic_analysis_flow_is_exercised," in checker_main,
@@ -580,6 +584,10 @@ def test_completed_plans_are_in_docs_plans():
     assert_true(
         "test_noaa_result_counts_remain_stable_across_pages," in checker_main,
         "stable NOAA result-count contract must run in the main suite",
+    )
+    assert_true(
+        "test_readme_setup_and_dependency_requirements," in checker_main,
+        "README setup and dependency contract must run in the main suite",
     )
 
 
@@ -838,6 +846,39 @@ def test_dependency_and_ci_contracts():
         assert_true(phrase in docs_text, "Make boundary documentation must include {0!r}".format(phrase))
 
 
+def test_readme_setup_and_dependency_requirements():
+    readme = " ".join((ROOT / "README.md").read_text().split())
+    vision = " ".join((ROOT / "VISION.md").read_text().split())
+    changes = " ".join((ROOT / "CHANGES.md").read_text().split())
+
+    for contract in (
+        "CPython 3.12 or 3.14",
+        "reproducible Linux x86_64 installs",
+        "requirements-py312.lock",
+        "requirements-py314.lock",
+        "python3.12 -m venv .venv",
+        "python3.14 -m venv .venv",
+        "Do not install `requirements.txt` directly for a reviewed environment",
+        "`uv` is required only to regenerate both lockfiles with `make lock`",
+        "`NOAA_TOKEN` is not required for `make check`",
+    ):
+        assert_true(contract in readme, "README setup guidance must include {0}".format(contract))
+    for requirement in (
+        line.strip()
+        for line in (ROOT / "requirements.txt").read_text().splitlines()
+        if line.strip() and not line.lstrip().startswith("#")
+    ):
+        assert_true("`{0}`".format(requirement) in readme, "README must list direct pin {0}".format(requirement))
+    assert_true(
+        "Keep README setup and exact dependency requirements aligned with the supported lockfiles" in vision,
+        "VISION must preserve setup and lockfile guidance",
+    )
+    assert_true(
+        "matching Python 3.12 or 3.14 lockfile" in changes,
+        "CHANGES must record supported lockfile selection",
+    )
+
+
 def main():
     tests = [
         test_noaa_token_comes_from_environment,
@@ -860,6 +901,7 @@ def main():
         test_synthetic_analysis_flow_is_exercised,
         test_analysis_provenance_is_visible_and_deterministic,
         test_dependency_and_ci_contracts,
+        test_readme_setup_and_dependency_requirements,
     ]
     for test in tests:
         test()

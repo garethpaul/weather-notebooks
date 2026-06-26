@@ -5,44 +5,102 @@
 
 ## Overview
 
-`garethpaul/weather-notebooks` is a data science notebook project. Weather Notebooks
+`garethpaul/weather-notebooks` is a reproducible NOAA weather-data notebook and
+an importable set of request, validation, conversion, dataframe, and plotting
+helpers.
 
-This README is based on the checked-in source, manifests, scripts, and repository metadata on the `master` branch. The project language mix found during review was: no dominant source language detected.
+The checked-in analysis uses a fixed historical station and date range. It does
+not provide current-weather conditions or a representative climate series.
 
 ## Repository Contents
 
-- `SECURITY.md` - security reporting and disclosure guidance
-- `VISION.md` - project direction and maintenance guardrails
-
-Additional scan context:
-
-- Source directories: no top-level source directories detected
-- Dependency and build manifests: none detected
-- Entry points or build surfaces: none detected
-- Test-looking files: no obvious test files detected
+- `Weather.ipynb` - the preserved interactive NOAA analysis
+- `weather_notebook.py` - reusable NOAA request and transformation helpers
+- `weather_notebook_tests.py` - dependency-aware offline behavior tests
+- `requirements.txt` - five exact direct dependency pins used as lock input
+- `requirements-py312.lock` and `requirements-py314.lock` - reviewed complete
+  Linux dependency graphs with SHA-256 hashes
+- `Makefile` and `scripts/` - canonical verification, lock generation, static
+  contracts, and Make authority tests
+- `SECURITY.md` and `VISION.md` - security and maintenance guardrails
 
 ## Getting Started
 
 ### Prerequisites
 
 - Git
-- Python 3
-- A NOAA Climate Data Online API token available as `NOAA_TOKEN`
+- CPython 3.12 or 3.14 with `venv` and pip
+- A NOAA Climate Data Online API token available as `NOAA_TOKEN` only when
+  running the live notebook
+
+The repository supports reproducible Linux x86_64 installs only for the two
+Python versions with reviewed lockfiles:
+
+- Python 3.12 uses `requirements-py312.lock`.
+- Python 3.14 uses `requirements-py314.lock`.
+
+Do not install `requirements.txt` directly for a reviewed environment. It is
+the five-package direct input to lock generation; the version-matched lockfile
+contains the complete transitive graph and required hashes. `uv` is required
+only to regenerate both lockfiles with `make lock`, not for normal setup.
+
+The direct dependency requirements are:
+
+- `jupyter==1.1.1`
+- `matplotlib==3.10.9`
+- `numpy==2.4.6`
+- `pandas==3.0.3`
+- `requests==2.34.2`
 
 ### Setup
 
 ```bash
 git clone https://github.com/garethpaul/weather-notebooks.git
 cd weather-notebooks
-python -m pip install --require-hashes -r requirements-py312.lock
-export NOAA_TOKEN=your-noaa-token
 ```
 
-The setup commands above are derived from repository files. Legacy mobile, Python, or JavaScript samples may require older SDKs or package versions than a modern workstation uses by default.
+Create exactly one of the following environments.
+
+#### Python 3.12
+
+```bash
+python3.12 -m venv .venv
+. .venv/bin/activate
+python -m pip install --require-hashes -r requirements-py312.lock
+```
+
+#### Python 3.14
+
+```bash
+python3.14 -m venv .venv
+. .venv/bin/activate
+python -m pip install --require-hashes -r requirements-py314.lock
+```
+
+Then verify the selected environment:
+
+```bash
+python -c "import jupyter, matplotlib, numpy, pandas, requests"
+make check
+```
+
+`NOAA_TOKEN` is not required for `make check`; the gate is offline and uses fake
+responses. Export the token only in the shell that launches a live notebook:
+
+```bash
+export NOAA_TOKEN=your-noaa-token
+jupyter notebook Weather.ipynb
+```
+
+If the selected interpreter is unavailable, install CPython 3.12 or 3.14 rather
+than applying the other lockfile to an unreviewed Python version. A different
+operating system or CPU architecture needs a separately generated and reviewed
+lockfile before the environment can be called reproducible.
 
 ## Running or Using the Project
 
-- Run `jupyter notebook Weather.ipynb` after installing dependencies and setting `NOAA_TOKEN`.
+- Run `jupyter notebook Weather.ipynb` after installing the matching lockfile
+  and setting `NOAA_TOKEN` in the launch shell.
 - The notebook fetches NOAA CDO observations for station `GHCND:US1CAMR0037` across the configured date range.
 - The station is the repository's original sample selection, and the fixed
   2019 range keeps the analysis bounded and historical. Neither is claimed as
@@ -88,6 +146,8 @@ The setup commands above are derived from repository files. Legacy mobile, Pytho
   title and axis labels.
 - `make lock` regenerates reviewed Python 3.12 and 3.14 Linux lockfiles with
   SHA-256 hashes from the five direct pins in `requirements.txt`.
+- See `docs/plans/2026-06-26-readme-setup-and-dependencies.md` for the supported
+  interpreter, lock-selection, token, and lock-regeneration guidance.
 - Hosted installs use pip `--require-hashes` against the matrix-matched lock;
   the current 106-package graph returned no findings from the official OSV API.
 - Completed maintenance plans live under `docs/plans` and are checked by

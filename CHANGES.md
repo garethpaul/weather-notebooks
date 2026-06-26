@@ -1,5 +1,26 @@
 # Changes
 
+## 2026-06-26
+
+- Priority P2 cycle: completed the only explicit roadmap gap; no delegated
+  threads were started because the documentation and contract change was small
+  and isolated.
+- Documented reproducible virtual-environment setup with the matching Python
+  3.12 or 3.14 lockfile and an explicit import verification step.
+- Clarified that `requirements.txt` is lock-generation input, `uv` is needed
+  only for `make lock`, and the NOAA token is required only for live notebook
+  requests rather than offline verification.
+- Replaced stale generated repository inventory with the actual notebook,
+  helper, test, dependency, and verification surfaces and added fail-closed
+  documentation contracts.
+- Python 3.12.13 and 3.14.6 each passed hash-locked installation, scientific
+  imports, 27 offline tests, 21 static contracts, 40 Make authority cases, and
+  full checkout-local plus external-directory `make check` gates. Fourteen
+  hostile documentation and registration mutations were rejected.
+- No blocker remains. The next recommended action is to keep direct pins,
+  lockfiles, README guidance, and the hosted matrix synchronized whenever the
+  scientific environment changes.
+
 ## 2026-06-21
 
 - Isolated Make verification authority from caller-controlled roots, shells,
